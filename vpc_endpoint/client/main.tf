@@ -1,4 +1,3 @@
-// client/main.tf
 terraform {
   required_version = ">= 1.6"
   required_providers {
@@ -69,7 +68,6 @@ resource "aws_vpc_endpoint" "service" {
   private_dns_enabled = false
 }
 
-// client/outputs.tf
 output "endpoint_dns_name" {
   value = aws_vpc_endpoint.service.dns_entry[0].dns_name
 }

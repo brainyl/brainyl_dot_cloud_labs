@@ -1,4 +1,3 @@
-// service/main.tf
 terraform {
   required_version = ">= 1.6"
   required_providers {
@@ -30,7 +29,6 @@ module "service_vpc" {
   enable_dns_support   = true
 }
 
-// service/main.tf (continued)
 resource "aws_network_interface" "web" {
   subnet_id       = module.service_vpc.private_subnets[0]
   security_groups = [aws_security_group.web.id]
@@ -177,7 +175,6 @@ resource "aws_vpc_endpoint_service" "web" {
 data "aws_caller_identity" "current" {}
 
 
-// service/outputs.tf
 output "service_cidr" {
   value = module.service_vpc.vpc_cidr_block
 }

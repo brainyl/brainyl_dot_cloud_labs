@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-auto-mode
+  labels:
+    app: hello-auto-mode
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-auto-mode
+  template:
+    metadata:
+      labels:
+        app: hello-auto-mode
+    spec:
+      containers:
+        - name: web
+          image: public.ecr.aws/docker/library/nginx:1.25
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-auto-mode
+spec:
+  type: ClusterIP
+  selector:
+    app: hello-auto-mode
+  ports:
+    - port: 80
+      targetPort: 80
