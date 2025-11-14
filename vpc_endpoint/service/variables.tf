@@ -17,5 +17,5 @@ variable "azs" {
 variable "allowed_client_cidr" {
   type        = string
   description = "CIDR block for the client VPC that should be allowed through the NLB security group"
-  default = "10.20.0.0/16"
+  default     = "10.20.0.0/16"
 }

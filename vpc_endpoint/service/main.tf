@@ -39,7 +39,6 @@ resource "aws_network_interface" "web" {
 resource "aws_instance" "web" {
   ami                    = data.aws_ami.al2023.id
   instance_type          = "t3.micro"
-  subnet_id              = module.service_vpc.private_subnets[0]
   iam_instance_profile   = aws_iam_instance_profile.web.name
   network_interface {
     device_index         = 0
@@ -118,11 +117,29 @@ module "nlb" {
 
   load_balancer_type = "network"
   internal           = true
+  vpc_id             = module.service_vpc.vpc_id
   subnets            = module.service_vpc.private_subnets
-  security_groups    = [aws_security_group.nlb.id]
 
   enable_deletion_protection = false
   enable_cross_zone_load_balancing = false # see gotcha section
+
+  # Security Group for NLB (used with PrivateLink)
+  enforce_security_group_inbound_rules_on_private_link_traffic = "off"
+  security_group_ingress_rules = {
+    allow_client_vpc = {
+      from_port   = 80
+      to_port     = 80
+      ip_protocol = "tcp"
+      description = "Allow client VPC traffic"
+      cidr_ipv4   = var.allowed_client_cidr
+    }
+  }
+  security_group_egress_rules = {
+    all = {
+      ip_protocol = "-1"
+      cidr_ipv4   = "0.0.0.0/0"
+    }
+  }
 
   listeners = {
     http = {
@@ -149,27 +166,6 @@ module "nlb" {
     }
   }
 }
-
-resource "aws_security_group" "nlb" {
-  name        = "service-nlb"
-  description = "Allow client VPC traffic"
-  vpc_id      = module.service_vpc.vpc_id
-
-  ingress {
-    protocol    = "tcp"
-    from_port   = 80
-    to_port     = 80
-    cidr_blocks = [var.allowed_client_cidr]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
 
 resource "aws_vpc_endpoint_service" "web" {
   acceptance_required        = false
