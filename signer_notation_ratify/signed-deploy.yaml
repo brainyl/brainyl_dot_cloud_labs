@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: signed-app
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: signed-app
+  template:
+    metadata:
+      labels:
+        app: signed-app
+    spec:
+      containers:
+        - name: signed
+          image: 386452075078.dkr.ecr.us-west-2.amazonaws.com/secure-demo:385466d4ef085729d7b326f2033ea16b4d41534d

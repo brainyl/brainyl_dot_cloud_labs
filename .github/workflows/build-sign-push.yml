@@ -186,4 +186,13 @@ jobs:
 
       - name: Upload build metadata
         if: always()
-        run: notation list
+        env:
+          REPO_URL: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+        run: |
+          if [ -n "$IMAGE_DIGEST" ]; then
+            IMAGE_DIGEST_REF="$REPO_URL@sha256:$IMAGE_DIGEST"
+            echo "Listing signatures for: $IMAGE_DIGEST_REF"
+            notation list "$IMAGE_DIGEST_REF" || echo "No signatures found or error listing signatures"
+          else
+            echo "IMAGE_DIGEST not available, skipping signature listing"
+          fi

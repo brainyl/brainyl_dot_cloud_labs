@@ -8,6 +8,12 @@ data "aws_eks_cluster_auth" "this" {
 
 data "aws_caller_identity" "current" {}
 
+# Get OIDC provider - construct ARN from cluster OIDC issuer
+locals {
+  oidc_provider_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(data.aws_eks_cluster.this.identity[0].oidc[0].issuer, "https://", "")}"
+  oidc_provider_url = replace(data.aws_eks_cluster.this.identity[0].oidc[0].issuer, "https://", "")
+}
+
 data "aws_iam_policy_document" "ratify_signer_permissions" {
   statement {
     sid     = "SignerRevocation"
@@ -29,12 +35,15 @@ resource "aws_iam_role" "ratify" {
       {
         Effect = "Allow"
         Principal = {
-          Service = "pods.eks.amazonaws.com"
+          Federated = local.oidc_provider_arn
         }
-        Action = [
-          "sts:AssumeRole",
-          "sts:TagSession"
-        ]
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "${local.oidc_provider_url}:sub" = "system:serviceaccount:gatekeeper-system:ratify-admin"
+            "${local.oidc_provider_url}:aud" = "sts.amazonaws.com"
+          }
+        }
       }
     ]
   })
@@ -56,19 +65,13 @@ resource "kubernetes_namespace" "gatekeeper_system" {
   }
 }
 
-resource "aws_eks_pod_identity_association" "ratify" {
-  cluster_name    = var.cluster_name
-  namespace       = "gatekeeper-system"
-  service_account = "ratify-admin"
-  role_arn        = aws_iam_role.ratify.arn
-
-  depends_on = [kubernetes_namespace.gatekeeper_system]
-}
-
 resource "kubernetes_service_account" "ratify" {
   metadata {
     name      = "ratify-admin"
     namespace = kubernetes_namespace.gatekeeper_system.metadata[0].name
+    annotations = {
+      "eks.amazonaws.com/role-arn" = aws_iam_role.ratify.arn
+    }
   }
 
   depends_on = [kubernetes_namespace.gatekeeper_system]
@@ -109,12 +112,12 @@ resource "helm_release" "gatekeeper" {
 
   set {
     name  = "mutatingWebhookTimeoutSeconds"
-    value = "2"
+    value = "10"
   }
 
   set {
     name  = "externaldataProviderResponseCacheTTL"
-    value = "10s"
+    value = "30s"
   }
 }
 
@@ -127,7 +130,6 @@ resource "helm_release" "ratify" {
   depends_on = [
     kubernetes_namespace.gatekeeper_system,
     kubernetes_service_account.ratify,
-    aws_eks_pod_identity_association.ratify,
     aws_iam_role_policy_attachment.ratify_ecr,
     aws_iam_role_policy.ratify_signer
   ]
@@ -167,6 +169,22 @@ resource "helm_release" "ratify" {
           }
         ]
       }
+      # IRSA should inject AWS_ROLE_ARN automatically, but we explicitly set it
+      # along with AWS_WEB_IDENTITY_TOKEN_FILE to ensure they're correct
+      extraEnv = [
+        {
+          name  = "AWS_REGION"
+          value = var.region
+        },
+        {
+          name  = "AWS_ROLE_ARN"
+          value = aws_iam_role.ratify.arn
+        },
+        {
+          name  = "AWS_WEB_IDENTITY_TOKEN_FILE"
+          value = "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+        }
+      ]
     })
   ]
   set {
@@ -183,6 +201,11 @@ resource "helm_release" "ratify" {
     value = "true"
   }
 }
+
+# Note: IRSA (IAM Roles for Service Accounts) automatically injects AWS_ROLE_ARN and
+# AWS_WEB_IDENTITY_TOKEN_FILE into pods using the annotated service account.
+# Ratify's ECR auth provider requires these variables, so IRSA is the correct choice
+# for Ratify authentication (as opposed to EKS Pod Identity).
 
 # Wait for Gatekeeper CRDs to be available
 resource "null_resource" "wait_for_gatekeeper_crds" {

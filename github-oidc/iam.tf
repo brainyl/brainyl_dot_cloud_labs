@@ -72,11 +72,12 @@ resource "aws_iam_role_policy" "github_ci_sns" {
             "signer:StartSigningJob",
             "signer:GetSigningProfile",
             "signer:DescribeSigningJob",
-            "signer:SignPayload"
+            "signer:SignPayload",
+            "signer:GetRevocationStatus"
             ],
             "Resource": [
                 "arn:aws:signer:us-west-2:123456789012:/signing-profiles/ekssecureworkloads",
-                "arn:aws:signer:us-west-2:123456789012:signing-jobs/*"
+                "arn:aws:signer:us-west-2:123456789012:/signing-jobs/*",
             ]
         }
     ]
