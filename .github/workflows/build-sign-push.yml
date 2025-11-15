@@ -43,7 +43,7 @@ jobs:
           tar -xzf v1.0.2292.tar.gz
           
           notation plugin install aws-signer \
-            --path aws-signer-notation-plugin-1.0.2292
+            --file aws-signer-notation-plugin-1.0.2292/build/bin/notation-com.amazonaws.signer.notation.plugin
           
           notation key add \
             --plugin com.amazonaws.signer.notation.plugin \
