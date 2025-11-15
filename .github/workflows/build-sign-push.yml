@@ -104,10 +104,35 @@ jobs:
 
       - name: Configure Notation for ECR authentication
         run: |
-          # Notation uses Docker credential helpers
-          # Ensure Docker is authenticated with ECR (ECR login action should have done this)
-          # Refresh ECR credentials to ensure they're available to Notation
+          # Ensure Docker is authenticated with ECR
           aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+          
+          # Notation should use Docker's credential store by default
+          # Verify Docker credentials are stored
+          if [ -f "$HOME/.docker/config.json" ]; then
+            echo "Docker credentials found"
+          else
+            echo "Warning: Docker config not found at expected location"
+          fi
+          
+          # Configure Notation to use Docker credential store
+          # Create Notation config directory
+          mkdir -p ~/.config/notation
+          
+          # Check if Notation config exists and update it
+          if [ -f ~/.config/notation/config.json ]; then
+            # Merge credential helpers into existing config
+            echo "Notation config already exists"
+          else
+            # Create new config with Docker credential helper
+            cat > ~/.config/notation/config.json <<EOF
+          {
+            "credentialHelpers": {
+              "${{ steps.login-ecr.outputs.registry }}": "docker"
+            }
+          }
+          EOF
+          fi
 
       - name: Sign image with AWS Signer via Notation
         env:
