@@ -33,17 +33,36 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
       - name: Set up Notation CLI
         run: |
           curl -LO https://github.com/notaryproject/notation/releases/download/v${NOTATION_VERSION}/notation_${NOTATION_VERSION}_linux_amd64.tar.gz
           tar xvzf notation_${NOTATION_VERSION}_linux_amd64.tar.gz notation
           sudo mv notation /usr/local/bin/
+
+      - name: Build and install AWS Signer Notation plugin
+        run: |
+          go version
           
-          curl -LO https://github.com/aws/aws-signer-notation-plugin/archive/refs/tags/v1.0.2292.tar.gz
-          tar -xzf v1.0.2292.tar.gz
+          # Download and extract the source code
+          curl -Lo notation-aws-signer.tar.gz https://github.com/aws/aws-signer-notation-plugin/archive/refs/tags/v1.0.2292.tar.gz
+          tar -xzf notation-aws-signer.tar.gz
+          cd aws-signer-notation-plugin-1.0.2292
           
-          notation plugin install --file aws-signer-notation-plugin-1.0.2292/build/bin/notation-com.amazonaws.signer.notation.plugin
+          # Build the plugin (this generates mocks and compiles the binary)
+          make build
           
+          # Install the built plugin
+          notation plugin install --file build/bin/notation-com.amazonaws.signer.notation.plugin
+          
+          # Return to working directory
+          cd ..
+          
+          # Add the signing key
           notation key add \
             --plugin com.amazonaws.signer.notation.plugin \
             --id "arn:aws:signer:${{ env.AWS_REGION }}:${{ steps.configure-aws-credentials.outputs.aws-account-id }}:/signing-profiles/${SIGNER_PROFILE_NAME}" \
