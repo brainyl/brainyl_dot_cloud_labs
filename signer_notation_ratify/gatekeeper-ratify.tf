@@ -334,8 +334,7 @@ metadata:
   namespace: gatekeeper-system
 spec:
   name: notation-com.amazonaws.signer.notation.plugin
-  artifactTypes:
-    - application/vnd.oci.image.manifest.v1+json
+  artifactTypes: application/vnd.oci.image.manifest.v1+json
   source:
     artifact: public.ecr.aws/aws-signer/notation-plugin:linux-amd64-latest
 YAML
@@ -363,8 +362,7 @@ metadata:
   namespace: gatekeeper-system
 spec:
   name: notation
-  artifactTypes:
-    - application/vnd.cncf.notary.signature
+  artifactTypes: application/vnd.cncf.notary.signature
   parameters:
     verificationCertStores:
       certs:

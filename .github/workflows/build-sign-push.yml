@@ -72,6 +72,8 @@ jobs:
         run: |
           curl -o aws-signer-notation-root.cert https://d2hvyiie56hcat.cloudfront.net/aws-signer-notation-root.cert
           notation cert add --type signingAuthority --store aws-signer-ts aws-signer-notation-root.cert
+          # Verify certificate was added
+          notation cert ls --type signingAuthority --store aws-signer-ts
 
       - name: Configure Notation trust policy
         run: |
@@ -95,7 +97,10 @@ jobs:
               }
             ]
           }' > aws-signer-trust-policy.json
+          cat aws-signer-trust-policy.json
           notation policy import --force aws-signer-trust-policy.json
+          # Verify policy was imported
+          notation policy show
 
       - name: Pull, tag, and push image
         env:
@@ -143,8 +148,25 @@ jobs:
         env:
           IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
         run: |
-          notation sign --key my-aws-signer-key "$IMAGE"
-          notation verify "$IMAGE"
+          # Sign the image and capture the digest
+          SIGN_OUTPUT=$(notation sign --key my-aws-signer-key "$IMAGE" 2>&1)
+          echo "$SIGN_OUTPUT"
+          
+          # Extract the digest from the sign output (look for @sha256:...)
+          DIGEST=$(echo "$SIGN_OUTPUT" | grep -o '@sha256:[a-f0-9]\{64\}' | head -1)
+          if [ -z "$DIGEST" ]; then
+            echo "Warning: Could not extract digest from sign output, using tag"
+            IMAGE_DIGEST="$IMAGE"
+          else
+            IMAGE_DIGEST="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}$DIGEST"
+            echo "Using digest for verification: $IMAGE_DIGEST"
+          fi
+          
+          # Wait a moment for signature to propagate
+          sleep 3
+          
+          # Verify using the digest
+          notation verify "$IMAGE_DIGEST"
 
       - name: Upload build metadata
         if: always()
