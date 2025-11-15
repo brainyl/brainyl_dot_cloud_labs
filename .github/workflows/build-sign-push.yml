@@ -92,18 +92,19 @@ jobs:
           }' > aws-signer-trust-policy.json
           notation policy import --force aws-signer-trust-policy.json
 
-      - name: Build container image
+      - name: Pull, tag, and push image
+        env:
+          SOURCE_IMAGE: public.ecr.aws/docker/library/alpine:3.19
+          IMAGE_TAG: ${{ github.sha }}
+          REPO_URL: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
         run: |
-          docker build -t $ECR_REPOSITORY:${{ github.sha }} .
-          docker tag $ECR_REPOSITORY:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
-
-      - name: Push image to ECR
-        run: |
-          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
+          docker pull "$SOURCE_IMAGE"
+          docker tag "$SOURCE_IMAGE" "$REPO_URL:$IMAGE_TAG"
+          docker push "$REPO_URL:$IMAGE_TAG"
 
       - name: Sign image with AWS Signer via Notation
         env:
-          IMAGE: ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
+          IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
         run: |
           notation sign --key my-aws-signer-key "$IMAGE"
           notation verify "$IMAGE"
