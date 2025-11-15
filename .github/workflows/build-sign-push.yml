@@ -65,7 +65,7 @@ jobs:
           # Add the signing key
           notation key add \
             --plugin com.amazonaws.signer.notation.plugin \
-            --id "arn:aws:signer:${{ env.AWS_REGION }}:${{ steps.configure-aws-credentials.outputs.aws-account-id }}:/signing-profiles/${SIGNER_PROFILE_NAME}" \
+            --id "arn:aws:signer:${{ env.AWS_REGION }}:${{ steps.configure-aws-credentials.outputs.aws-account-id }}:/signing-profiles/${{ env.SIGNER_PROFILE_NAME }}" \
             my-aws-signer-key || true
 
       - name: Configure Notation trust policy
@@ -76,7 +76,7 @@ jobs:
               {
                 "name": "aws-signer-trust",
                 "registryScopes": [
-                  "${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY"
+                  "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}"
                 ],
                 "signatureVerification": {
                   "level": "strict"
@@ -85,7 +85,7 @@ jobs:
                   "signingAuthority:aws-signer-ts"
                 ],
                 "trustedIdentities": [
-                  "arn:aws:signer:${{ env.AWS_REGION }}:${{ steps.configure-aws-credentials.outputs.aws-account-id }}:/signing-profiles/${SIGNER_PROFILE_NAME}"
+                  "arn:aws:signer:${{ env.AWS_REGION }}:${{ steps.configure-aws-credentials.outputs.aws-account-id }}:/signing-profiles/${{ env.SIGNER_PROFILE_NAME }}"
                 ]
               }
             ]
