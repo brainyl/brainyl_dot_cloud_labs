@@ -40,6 +40,14 @@ resource "aws_iam_role_policy" "github_ci_sns" {
         "Resource" : "*"
       },
       {
+        "Sid": "AllowLoginToECR",
+        "Effect": "Allow",
+        "Action": [
+            "ecr:GetAuthorizationToken"
+        ],
+        "Resource": "*"
+      },
+      {
         "Sid": "ECRPushAndList",
         "Effect": "Allow",
         "Action": [
@@ -48,7 +56,6 @@ resource "aws_iam_role_policy" "github_ci_sns" {
             "ecr:CreateRepository",
             "ecr:DescribeImages",
             "ecr:DescribeRepositories",
-            "ecr:GetAuthorizationToken",
             "ecr:GetDownloadUrlForLayer",
             "ecr:InitiateLayerUpload",
             "ecr:PutImage",
