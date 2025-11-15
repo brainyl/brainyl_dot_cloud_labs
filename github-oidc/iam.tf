@@ -52,11 +52,13 @@ resource "aws_iam_role_policy" "github_ci_sns" {
         "Effect": "Allow",
         "Action": [
             "ecr:BatchCheckLayerAvailability",
+            "ecr:BatchGetImage",
             "ecr:CompleteLayerUpload",
             "ecr:CreateRepository",
             "ecr:DescribeImages",
             "ecr:DescribeRepositories",
             "ecr:GetDownloadUrlForLayer",
+            "ecr:GetRepositoryPolicy",
             "ecr:InitiateLayerUpload",
             "ecr:PutImage",
             "ecr:UploadLayerPart"
@@ -69,7 +71,8 @@ resource "aws_iam_role_policy" "github_ci_sns" {
             "Action": [
             "signer:StartSigningJob",
             "signer:GetSigningProfile",
-            "signer:DescribeSigningJob"
+            "signer:DescribeSigningJob",
+            "signer:SignPayload"
             ],
             "Resource": [
                 "arn:aws:signer:us-west-2:123456789012:/signing-profiles/ekssecureworkloads",

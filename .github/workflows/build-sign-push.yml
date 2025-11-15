@@ -68,6 +68,11 @@ jobs:
             --id "arn:aws:signer:${{ env.AWS_REGION }}:${{ steps.configure-aws-credentials.outputs.aws-account-id }}:/signing-profiles/${{ env.SIGNER_PROFILE_NAME }}" \
             my-aws-signer-key || true
 
+      - name: Add AWS Signer root certificate to trust store
+        run: |
+          curl -o aws-signer-notation-root.cert https://d2hvyiie56hcat.cloudfront.net/aws-signer-notation-root.cert
+          notation cert add --type signingAuthority --store aws-signer-ts aws-signer-notation-root.cert
+
       - name: Configure Notation trust policy
         run: |
           echo '{
