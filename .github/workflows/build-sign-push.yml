@@ -110,7 +110,21 @@ jobs:
         run: |
           docker pull "$SOURCE_IMAGE"
           docker tag "$SOURCE_IMAGE" "$REPO_URL:$IMAGE_TAG"
-          docker push "$REPO_URL:$IMAGE_TAG"
+          # Push and capture the digest from push output
+          PUSH_OUTPUT=$(docker push "$REPO_URL:$IMAGE_TAG" 2>&1)
+          echo "$PUSH_OUTPUT"
+          # Extract digest from push output (format: digest: sha256:...)
+          IMAGE_DIGEST=$(echo "$PUSH_OUTPUT" | grep -o 'sha256:[a-f0-9]\{64\}' | head -1 | cut -d':' -f2)
+          if [ -z "$IMAGE_DIGEST" ]; then
+            # Fallback: use docker manifest inspect
+            IMAGE_DIGEST=$(docker manifest inspect "$REPO_URL:$IMAGE_TAG" 2>/dev/null | grep '"digest"' | head -1 | grep -o 'sha256:[a-f0-9]\{64\}' | cut -d':' -f2)
+          fi
+          if [ -z "$IMAGE_DIGEST" ]; then
+            echo "Error: Could not extract image digest"
+            exit 1
+          fi
+          echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> $GITHUB_ENV
+          echo "Image digest: $IMAGE_DIGEST"
 
       - name: Configure Notation for ECR authentication
         run: |
@@ -146,27 +160,29 @@ jobs:
 
       - name: Sign image with AWS Signer via Notation
         env:
-          IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          REPO_URL: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
         run: |
-          # Sign the image and capture the digest
-          SIGN_OUTPUT=$(notation sign --key my-aws-signer-key "$IMAGE" 2>&1)
-          echo "$SIGN_OUTPUT"
+          # Ensure Notation can authenticate to ECR for pulling signatures
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
           
-          # Extract the digest from the sign output (look for @sha256:...)
-          DIGEST=$(echo "$SIGN_OUTPUT" | grep -o '@sha256:[a-f0-9]\{64\}' | head -1)
-          if [ -z "$DIGEST" ]; then
-            echo "Warning: Could not extract digest from sign output, using tag"
-            IMAGE_DIGEST="$IMAGE"
-          else
-            IMAGE_DIGEST="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}$DIGEST"
-            echo "Using digest for verification: $IMAGE_DIGEST"
-          fi
+          # Construct the full image digest reference
+          IMAGE_DIGEST="$REPO_URL@sha256:$IMAGE_DIGEST"
+          echo "Signing image with digest: $IMAGE_DIGEST"
           
-          # Wait a moment for signature to propagate
-          sleep 3
+          # Sign using the digest directly
+          notation sign --key my-aws-signer-key "$IMAGE_DIGEST"
           
-          # Verify using the digest
-          notation verify "$IMAGE_DIGEST"
+          # Wait for signature to propagate in ECR
+          echo "Waiting for signature to propagate..."
+          sleep 5
+          
+          # Verify using the digest with verbose output
+          echo "Verifying signature for: $IMAGE_DIGEST"
+          notation verify --verbose "$IMAGE_DIGEST" || {
+            echo "Verification failed, checking if signature exists..."
+            notation list "$IMAGE_DIGEST" || true
+            exit 1
+          }
 
       - name: Upload build metadata
         if: always()
