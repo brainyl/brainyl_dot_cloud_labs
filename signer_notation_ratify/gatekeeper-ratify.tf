@@ -117,7 +117,7 @@ resource "helm_release" "gatekeeper" {
 
   set {
     name  = "externaldataProviderResponseCacheTTL"
-    value = "30s"
+    value = "0s"
   }
 }
 
@@ -282,7 +282,7 @@ spec:
           images_ephemeral := [img | img = input.review.object.spec.ephemeralContainers[_].image]
           other_images := array.concat(images_init, images_ephemeral)
           all_images := array.concat(other_images, images)
-          response := external_data({"provider": "ratify-gatekeeper-provider", "keys": all_images})
+          response := external_data({"provider": "ratify-provider", "keys": all_images})
         }
 
         # Base Gatekeeper violation

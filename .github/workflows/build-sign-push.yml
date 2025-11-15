@@ -104,7 +104,7 @@ jobs:
 
       - name: Pull, tag, and push image
         env:
-          SOURCE_IMAGE: public.ecr.aws/docker/library/alpine:3.19
+          SOURCE_IMAGE: public.ecr.aws/docker/library/nginx:latest
           IMAGE_TAG: ${{ github.sha }}
           REPO_URL: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
         run: |
