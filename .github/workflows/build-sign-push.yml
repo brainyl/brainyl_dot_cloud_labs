@@ -42,8 +42,7 @@ jobs:
           curl -LO https://github.com/aws/aws-signer-notation-plugin/archive/refs/tags/v1.0.2292.tar.gz
           tar -xzf v1.0.2292.tar.gz
           
-          notation plugin install aws-signer \
-            --file aws-signer-notation-plugin-1.0.2292/build/bin/notation-com.amazonaws.signer.notation.plugin
+          notation plugin install --file aws-signer-notation-plugin-1.0.2292/build/bin/notation-com.amazonaws.signer.notation.plugin
           
           notation key add \
             --plugin com.amazonaws.signer.notation.plugin \
