@@ -102,6 +102,13 @@ jobs:
           docker tag "$SOURCE_IMAGE" "$REPO_URL:$IMAGE_TAG"
           docker push "$REPO_URL:$IMAGE_TAG"
 
+      - name: Configure Notation for ECR authentication
+        run: |
+          # Notation uses Docker credential helpers
+          # Ensure Docker is authenticated with ECR (ECR login action should have done this)
+          # Refresh ECR credentials to ensure they're available to Notation
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+
       - name: Sign image with AWS Signer via Notation
         env:
           IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
