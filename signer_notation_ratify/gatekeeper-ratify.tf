@@ -1,3 +1,22 @@
+# ==============================================================================
+# Gatekeeper + Ratify with AWS Signer Integration
+# ==============================================================================
+# This configuration deploys Gatekeeper and Ratify to verify container image
+# signatures using AWS Signer. Key AWS Signer-specific requirements:
+#
+# 1. IAM Policy: Must include leading "/" in signing-jobs ARN:
+#    arn:aws:signer:REGION:ACCOUNT:/signing-jobs/* (note the colon-slash)
+#
+# 2. Trust Store Type: AWS Signer requires "signingAuthority" type, not "ca":
+#    verificationCertStores:
+#      signingAuthority:
+#        certs: [...]
+#    trustStores:
+#      - signingAuthority:certs
+#
+# 3. Certificate: AWS Signer root certificate required for signature validation
+# ==============================================================================
+
 data "aws_eks_cluster" "this" {
   name = var.cluster_name
 }
@@ -14,6 +33,8 @@ locals {
   oidc_provider_url = replace(data.aws_eks_cluster.this.identity[0].oidc[0].issuer, "https://", "")
 }
 
+# IAM policy for Ratify to check AWS Signer revocation status
+# IMPORTANT: ARN must include leading "/" before "signing-jobs"
 data "aws_iam_policy_document" "ratify_signer_permissions" {
   statement {
     sid     = "SignerRevocation"
@@ -21,7 +42,7 @@ data "aws_iam_policy_document" "ratify_signer_permissions" {
     effect  = "Allow"
     resources = [
       aws_signer_signing_profile.eks_secure.arn,
-      "arn:aws:signer:${var.region}:${data.aws_caller_identity.current.account_id}:signing-jobs/*"
+      "arn:aws:signer:${var.region}:${data.aws_caller_identity.current.account_id}:/signing-jobs/*"
     ]
   }
 }
@@ -144,33 +165,13 @@ resource "helm_release" "ratify" {
     value = kubernetes_service_account.ratify.metadata[0].name
   }
 
-  set {
-    name  = "notation.enabled"
-    value = "true"
-  }
-
-  set_sensitive {
-    # Use notationCerts array (notationCert is deprecated)
-    name  = "notationCerts[0]"
-    value = file("${path.module}/files/aws-signer-notation-root.cert")
-  }
-
-  # Use values file for complex nested structure to avoid nil pointer issues
   values = [
     yamlencode({
-      notation = {
-        trustPolicies = [
-          {
-            name                = "default"
-            verificatonLevel    = "strict"
-            registryScopes      = [aws_ecr_repository.secure_demo.repository_url]
-            trustedIdentities   = [aws_signer_signing_profile.eks_secure.arn]
-            trustStores         = [] # Empty array - trust stores auto-configured from notationCerts
-          }
-        ]
-      }
-      # IRSA should inject AWS_ROLE_ARN automatically, but we explicitly set it
-      # along with AWS_WEB_IDENTITY_TOKEN_FILE to ensure they're correct
+      # AWS Signer root certificate for signature validation
+      notationCerts = [
+        file("${path.module}/files/aws-signer-notation-root.cert")
+      ]
+      # Explicit AWS environment variables for IRSA authentication
       extraEnv = [
         {
           name  = "AWS_REGION"
@@ -187,6 +188,10 @@ resource "helm_release" "ratify" {
       ]
     })
   ]
+  set {
+    name  = "notation.enabled"
+    value = "true"
+  }
   set {
     name  = "featureFlags.RATIFY_EXPERIMENTAL_DYNAMIC_PLUGINS"
     value = "true"
@@ -306,7 +311,7 @@ spec:
         # Check if the success criteria is true
         general_violation[{"result": result}] {
           subject_validation := remote_data.responses[_]
-          subject_validation[1].succeeded == false
+          subject_validation[1].isSuccess == false
           result := sprintf("Artifact failed verification: %s, \nreport: %v", [subject_validation[0], subject_validation[1]])
         }
 YAML
@@ -369,14 +374,48 @@ YAML
   }
 }
 
+resource "null_resource" "ratify_certificate_store" {
+  depends_on = [null_resource.wait_for_ratify_crds]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Create CertificateStore CRD with AWS Signer root certificate
+      kubectl apply -f - <<YAML
+apiVersion: config.ratify.deislabs.io/v1beta1
+kind: CertificateStore
+metadata:
+  name: ratify-notation-inline-cert-0
+  namespace: gatekeeper-system
+spec:
+  provider: inline
+  parameters:
+    value: |
+$(cat ${path.module}/files/aws-signer-notation-root.cert | sed 's/^/      /')
+YAML
+    EOT
+  }
+
+  triggers = {
+    ratify_crds = null_resource.wait_for_ratify_crds.id
+    cert_file   = filemd5("${path.module}/files/aws-signer-notation-root.cert")
+  }
+}
+
 resource "null_resource" "ratify_notation_verifier" {
-  depends_on = [null_resource.wait_for_ratify_crds, null_resource.ratify_aws_signer_plugin]
+  depends_on = [
+    null_resource.wait_for_ratify_crds,
+    null_resource.ratify_aws_signer_plugin,
+    null_resource.ratify_certificate_store,
+    helm_release.ratify
+  ]
 
   provisioner "local-exec" {
     environment = {
       SIGNER_PROFILE_ARN = aws_signer_signing_profile.eks_secure.arn
     }
     command = <<-EOT
+      # Apply the Verifier with AWS Signer trust policy configuration
+      # Uses signingAuthority trust store type (required for AWS Signer)
       kubectl apply -f - <<YAML
 apiVersion: config.ratify.deislabs.io/v1beta1
 kind: Verifier
@@ -388,8 +427,9 @@ spec:
   artifactTypes: application/vnd.cncf.notary.signature
   parameters:
     verificationCertStores:
-      certs:
-        - ratify-notation-inline-cert
+      signingAuthority:
+        certs:
+          - ratify-notation-inline-cert-0
     trustPolicyDoc:
       version: "1.0"
       trustPolicies:
@@ -407,9 +447,17 @@ YAML
   }
 
   triggers = {
-    ratify_crds = null_resource.wait_for_ratify_crds.id
-    aws_signer_plugin = null_resource.ratify_aws_signer_plugin.id
+    ratify_crds         = null_resource.wait_for_ratify_crds.id
+    aws_signer_plugin   = null_resource.ratify_aws_signer_plugin.id
     signing_profile_arn = aws_signer_signing_profile.eks_secure.arn
+    certificate_store   = null_resource.ratify_certificate_store.id
+    helm_release        = helm_release.ratify.id
+    # Hash of the verifier config to detect trust policy changes
+    verifier_config_hash = md5(jsonencode({
+      trust_store_type   = "signingAuthority:certs"
+      verification_level = "strict"
+      registry_scopes    = ["*"]
+    }))
   }
 }
 

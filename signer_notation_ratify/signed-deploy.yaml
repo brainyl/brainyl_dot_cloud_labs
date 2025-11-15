@@ -15,4 +15,4 @@ spec:
     spec:
       containers:
         - name: signed
-          image: 386452075078.dkr.ecr.us-west-2.amazonaws.com/secure-demo:385466d4ef085729d7b326f2033ea16b4d41534d
+          image: 386452075078.dkr.ecr.us-west-2.amazonaws.com/secure-demo:85ea199d633cbe3123ed084264bd027bafe16b5c
