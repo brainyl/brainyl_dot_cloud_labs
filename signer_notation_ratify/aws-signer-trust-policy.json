@@ -1,0 +1,21 @@
+{
+    "version": "1.0",
+    "trustPolicies": [
+      {
+        "name": "aws-signer-trust",
+        "registryScopes": [
+          "123456789012.dkr.ecr.us-west-2.amazonaws.com/secure-demo"
+        ],
+        "signatureVerification": {
+          "level": "strict"
+        },
+        "trustStores": [
+          "signingAuthority:aws-signer-ts"
+        ],
+        "trustedIdentities": [
+          "arn:aws:signer:us-west-2:123456789012:/signing-profiles/ekssecureworkloads"
+        ]
+      }
+    ]
+  }
+  

@@ -1,0 +1,94 @@
+name: Build, Sign, and Push Container
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+
+jobs:
+  build-sign-push:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-west-2
+      ECR_REPOSITORY: secure-demo
+      SIGNER_PROFILE_NAME: ekssecureworkloads
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        id: configure-aws-credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume:  ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Notation CLI
+        run: |
+          curl -Lo notation.tar.gz https://github.com/notaryproject/notation/releases/download/v2.0.0/notation_2.0.0_linux_amd64.tar.gz
+          tar -xzf notation.tar.gz notation
+          sudo mv notation /usr/local/bin/
+          
+          curl -Lo notation-aws-signer.tar.gz https://github.com/aws/aws-signer-notation-plugin/releases/download/v1.0.2292/notation-aws-signer_1.0.2292_linux_amd64.tar.gz
+          tar -xzf notation-aws-signer.tar.gz
+          
+          notation plugin install aws-signer \
+            --path notation-aws-signer
+          
+          notation key add \
+            --plugin com.amazonaws.signer.notation.plugin \
+            --id "arn:aws:signer:${{ env.AWS_REGION }}:${{ steps.configure-aws-credentials.outputs.aws-account-id }}:/signing-profiles/${SIGNER_PROFILE_NAME}" \
+            my-aws-signer-key || true
+
+      - name: Configure Notation trust policy
+        run: |
+          echo '{
+            "version": "1.0",
+            "trustPolicies": [
+              {
+                "name": "aws-signer-trust",
+                "registryScopes": [
+                  "${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY"
+                ],
+                "signatureVerification": {
+                  "level": "strict"
+                },
+                "trustStores": [
+                  "signingAuthority:aws-signer-ts"
+                ],
+                "trustedIdentities": [
+                  "arn:aws:signer:${{ env.AWS_REGION }}:${{ steps.configure-aws-credentials.outputs.aws-account-id }}:/signing-profiles/${SIGNER_PROFILE_NAME}"
+                ]
+              }
+            ]
+          }' > aws-signer-trust-policy.json
+          notation policy import --force aws-signer-trust-policy.json
+
+      - name: Build container image
+        run: |
+          docker build -t $ECR_REPOSITORY:${{ github.sha }} .
+          docker tag $ECR_REPOSITORY:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
+
+      - name: Push image to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
+
+      - name: Sign image with AWS Signer via Notation
+        env:
+          IMAGE: ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
+        run: |
+          notation sign --key my-aws-signer-key "$IMAGE"
+          notation verify "$IMAGE"
+
+      - name: Upload build metadata
+        if: always()
+        run: notation list

@@ -38,7 +38,38 @@ resource "aws_iam_role_policy" "github_ci_sns" {
           "sns:TagResource"
         ],
         "Resource" : "*"
-      }
+      },
+      {
+        "Sid": "ECRPushAndList",
+        "Effect": "Allow",
+        "Action": [
+            "ecr:BatchCheckLayerAvailability",
+            "ecr:CompleteLayerUpload",
+            "ecr:CreateRepository",
+            "ecr:DescribeImages",
+            "ecr:DescribeRepositories",
+            "ecr:GetAuthorizationToken",
+            "ecr:GetDownloadUrlForLayer",
+            "ecr:InitiateLayerUpload",
+            "ecr:PutImage",
+            "ecr:UploadLayerPart"
+        ],
+        "Resource": "arn:aws:ecr:us-west-2:123456789012:repository/secure-demo"
+      },
+      {
+            "Sid": "SignerPermissions",
+            "Effect": "Allow",
+            "Action": [
+            "signer:StartSigningJob",
+            "signer:GetSigningProfile",
+            "signer:DescribeSigningJob"
+            ],
+            "Resource": [
+                "arn:aws:signer:us-west-2:123456789012:/signing-profiles/ekssecureworkloads",
+                "arn:aws:signer:us-west-2:123456789012:signing-jobs/*"
+            ]
+        }
     ]
   })
 }
+
