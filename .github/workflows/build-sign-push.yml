@@ -39,11 +39,11 @@ jobs:
           tar xvzf notation_${NOTATION_VERSION}_linux_amd64.tar.gz notation
           sudo mv notation /usr/local/bin/
           
-          curl -Lo notation-aws-signer.tar.gz https://github.com/aws/aws-signer-notation-plugin/releases/download/v1.0.2292/notation-aws-signer_1.0.2292_linux_amd64.tar.gz
-          tar -xzf notation-aws-signer.tar.gz
+          curl -LO https://github.com/aws/aws-signer-notation-plugin/archive/refs/tags/v1.0.2292.tar.gz
+          tar -xzf v1.0.2292.tar.gz
           
           notation plugin install aws-signer \
-            --path notation-aws-signer
+            --path aws-signer-notation-plugin-1.0.2292
           
           notation key add \
             --plugin com.amazonaws.signer.notation.plugin \
