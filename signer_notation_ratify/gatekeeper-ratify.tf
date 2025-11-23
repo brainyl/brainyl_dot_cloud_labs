@@ -207,10 +207,11 @@ resource "helm_release" "ratify" {
   }
 }
 
-# Note: IRSA (IAM Roles for Service Accounts) automatically injects AWS_ROLE_ARN and
-# AWS_WEB_IDENTITY_TOKEN_FILE into pods using the annotated service account.
-# Ratify's ECR auth provider requires these variables, so IRSA is the correct choice
-# for Ratify authentication (as opposed to EKS Pod Identity).
+# Note: While IRSA automatically injects AWS_ROLE_ARN and AWS_WEB_IDENTITY_TOKEN_FILE,
+# we explicitly set them above (lines 181-186) for clarity and to ensure proper values.
+# AWS_REGION must be set explicitly as IRSA doesn't provide it.
+# IRSA is used instead of EKS Pod Identity because Ratify's ECR auth provider specifically
+# requires the AWS_WEB_IDENTITY_TOKEN_FILE environment variable for authentication.
 
 # Wait for Gatekeeper CRDs to be available
 resource "null_resource" "wait_for_gatekeeper_crds" {

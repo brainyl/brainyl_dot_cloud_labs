@@ -2,7 +2,7 @@ name: Build, Sign, and Push Container
 
 on:
   push:
-    branches: ["main"]
+    branches: ["disabled"]
   workflow_dispatch:
 
 permissions:

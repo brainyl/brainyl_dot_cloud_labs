@@ -1,0 +1,1 @@
+image_uri="123456789012.dkr.ecr.us-west-2.amazonaws.com/agent:dev-latest"
