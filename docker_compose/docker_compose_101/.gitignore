@@ -1,0 +1,4 @@
+.env.local
+ghost-content/
+certs/
+*.log

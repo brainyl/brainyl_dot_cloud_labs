@@ -1,0 +1,15 @@
+{
+    "message": "Hello from S3!",
+    "timestamp": "2026-01-04T12:00:00Z",
+    "env": "production",
+    "features": [
+        "fastapi",
+        "docker",
+        "boto3",
+        "s3"
+    ],
+    "config": {
+        "debug": false,
+        "max_retries": 3
+    }
+}

@@ -1,0 +1,92 @@
+version: "3.8"
+
+services:
+  db:
+    image: mysql:8
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: ghost
+      MYSQL_USER: ghost
+      MYSQL_PASSWORD: ghostpass
+      MYSQL_ROOT_PASSWORD: rootpass
+    volumes:
+      - db_data_101:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$MYSQL_USER -p$MYSQL_PASSWORD || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+
+  ghost:
+    image: ghost:6
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    env_file:
+      - ./.env.local
+    ports:
+      - "2368:2368"
+    environment:
+      url: https://localhost
+      database__client: mysql
+      database__connection__host: db
+      database__connection__user: ghost
+      database__connection__password: ghostpass
+      database__connection__database: ghost
+      mail__transport: SMTP
+      mail__options__host: mailhog
+      mail__options__port: 1025
+      mail__options__secure: "false"
+      mail__from: "Brainyl Cloud <noreply@brainyl.cloud>"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          require('http').get('http://127.0.0.1:2368/ghost/api/admin/site/',
+          (res) => {
+            if (res.statusCode >= 400) {
+              process.exit(1);
+            }
+            res.resume();
+            res.on('end', () => process.exit(0));
+          }).on('error', () => process.exit(1));
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./ghost-content:/var/lib/ghost/content
+
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    depends_on:
+      ghost:
+        condition: service_healthy
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/etc/caddy/certs:ro
+      - ./media:/srv/media:ro
+      - ../content:/srv/content:ro
+    environment:
+      XDG_CONFIG_HOME: /config
+      XDG_DATA_HOME: /data
+
+volumes:
+  db_data_101:
+    driver: local

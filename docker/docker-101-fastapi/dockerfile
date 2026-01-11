@@ -1,0 +1,96 @@
+# syntax=docker/dockerfile:1.5
+# escape=\
+
+# Parser directives (like syntax and escape) must appear before any other instruction
+# syntax: enables BuildKit 1.5 features (heredocs, improved mounts)
+# escape: changes the line continuation character (useful on Windows)
+
+# ARG comes before FROM - it's the only instruction that can
+ARG PYTHON_VERSION=3.13
+ARG BASE_IMAGE=python:${PYTHON_VERSION}-slim
+
+# You can override ARGs when building:
+# docker build --build-arg PYTHON_VERSION=3.12 .
+
+FROM ${BASE_IMAGE} AS builder
+
+# LABEL stores image metadata following OCI image spec
+LABEL org.opencontainers.image.authors="team@brainyl.cloud"
+LABEL org.opencontainers.image.title="FastAPI Docker 101 Example"
+LABEL org.opencontainers.image.version="1.0.0"
+
+# RUN has two forms: shell and exec
+# Shell form: processed by /bin/sh -c (allows variable expansion)
+RUN echo "Building FastAPI image 🚀"
+
+# Exec form: runs the binary directly (no shell processing)
+RUN ["echo", "Using exec form"]
+
+# Heredoc syntax keeps multi-line commands readable
+# No more long chains of && and line continuation backslashes
+RUN <<EOF
+apt-get update
+apt-get install -y --no-install-recommends \
+    curl \
+    iputils-ping
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+EOF
+
+# Mount secrets during build without baking them into image layers
+# BuildKit feature - secrets never appear in final image or history
+RUN --mount=type=secret,id=build_secret,dst=/tmp/secret.txt \
+    if [ -f /tmp/secret.txt ]; then \
+        echo "Secret found, running authenticated build step"; \
+    else \
+        echo "No secret provided, skipping authenticated step"; \
+    fi
+
+# Build arguments - available during build only
+# Warning: ARG values show up in image metadata via docker inspect
+ARG BUILD_ARG=production
+ARG BUILD_DATE
+ARG GIT_COMMIT
+
+# Environment variables persist into running containers
+# Set Python-specific vars to improve container behavior
+ENV ENV_VAR=docker-101 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# WORKDIR creates the directory if missing and sets it as current
+WORKDIR /app
+
+# Copy dependency manifest first for layer cache optimization
+# If requirements.txt doesn't change, Docker reuses this layer
+COPY requirements.txt .
+
+# Install dependencies in their own layer
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code last - this layer changes most frequently
+# Keeping it separate means pip install layer stays cached
+COPY main.py .
+
+# EXPOSE is documentation - tells users which port the app uses
+# The actual port mapping happens at runtime with -p flag
+EXPOSE 8000
+
+# Never run production containers as root
+# Create a dedicated user with minimal permissions
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+# All subsequent commands run as this user
+USER appuser
+
+# ENTRYPOINT sets the main process - this part is fixed
+ENTRYPOINT ["uvicorn"]
+
+# CMD provides default arguments (can be completely replaced at runtime)
+# Warning: Overriding replaces ALL args, not just adds to them
+CMD ["main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Default command executed: uvicorn main:app --host 0.0.0.0 --port 8000

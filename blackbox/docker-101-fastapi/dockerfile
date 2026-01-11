@@ -1,0 +1,55 @@
+ARG PYTHON_VERSION=3.13
+ARG BASE_IMAGE=python:${PYTHON_VERSION}-slim
+
+FROM ${BASE_IMAGE} AS builder
+
+LABEL org.opencontainers.image.authors="team@brainyl.cloud"
+LABEL org.opencontainers.image.title="FastAPI Docker 101 Example"
+LABEL org.opencontainers.image.version="1.0.0"
+
+RUN echo "Building FastAPI image 🚀"
+
+RUN <<EOF
+apt-get update
+apt-get install -y --no-install-recommends \
+    curl \
+    iputils-ping
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+EOF
+
+RUN --mount=type=secret,id=build_secret,dst=/tmp/secret.txt \
+    if [ -f /tmp/secret.txt ]; then \
+        echo "Secret found, running authenticated build step"; \
+    else \
+        echo "No secret provided, skipping authenticated step"; \
+    fi
+
+ARG BUILD_ARG=production
+ARG BUILD_DATE
+ARG GIT_COMMIT
+
+ENV ENV_VAR=docker-101 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY main.py .
+
+EXPOSE 8000
+
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+ENTRYPOINT ["uvicorn"]
+
+CMD ["main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -2,3 +2,11 @@
 .terraform.lock.hcl
 terraform.tfstate
 terraform.tfstate.backup
+
+python
+*.zip
+*.log
+tfplan*
+node_modules
+__pycache__
+.next

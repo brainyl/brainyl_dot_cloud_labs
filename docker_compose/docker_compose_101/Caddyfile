@@ -1,0 +1,17 @@
+{
+    auto_https off
+}
+
+https://localhost {
+    tls /etc/caddy/certs/localhost.pem /etc/caddy/certs/localhost-key.pem
+
+    # Serve media files
+    handle_path /media/* {
+        root * /srv/media
+        file_server
+    }
+
+    reverse_proxy ghost:2368 {
+        header_up X-Forwarded-Proto https
+    }
+}
