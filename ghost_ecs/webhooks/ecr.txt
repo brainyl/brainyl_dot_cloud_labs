@@ -1,0 +1,35 @@
+# Installation Steps
+
+# Local Testing
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install requirments 
+uv pip install -r requirements.txt
+
+# Actviate virtual env
+source .venv/bin/activate
+
+# Run app locally
+uvicorn app:app --host 0.0.0.0 --port 8000
+
+
+# ECR Build and Push Steps
+
+# Set your AWS account ID (uses environment variable if set, otherwise defaults)
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-your-account-id-here}"
+
+# 1. Authenticate Docker to ECR
+aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.us-west-2.amazonaws.com
+
+# 2. Build the image for x86 (amd64)
+docker buildx build --platform linux/amd64 -t webhook-receiver .
+
+# 3. Tag the image for ECR
+docker tag webhook-receiver:latest $AWS_ACCOUNT_ID.dkr.ecr.us-west-2.amazonaws.com/webhook-receiver:latest
+
+# 4. Push to ECR
+docker push $AWS_ACCOUNT_ID.dkr.ecr.us-west-2.amazonaws.com/webhook-receiver:latest
+
+# Create ECR repository first if it doesn't exist:
+# aws ecr create-repository --repository-name webhook-receiver --region us-west-2
