@@ -59,6 +59,46 @@ resource "aws_iam_role" "task_role" {
   tags = local.tags
 }
 
+resource "aws_iam_role_policy" "task_role_ecs_exec" {
+  name = "${local.name_prefix}-task-role-ecs-exec"
+  role = aws_iam_role.task_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_cloudwatch_log_group" "ghost" {
+  name              = "/ecs/${local.name_prefix}-ghost"
+  retention_in_days = 14
+  tags              = local.tags
+}
+
+resource "aws_cloudwatch_log_group" "webhooks" {
+  name              = "/ecs/${local.name_prefix}-webhooks"
+  retention_in_days = 14
+  tags              = local.tags
+}
+
 resource "aws_ecs_cluster" "ghost" {
   name = "${local.name_prefix}-cluster"
   tags = local.tags
@@ -106,6 +146,15 @@ resource "aws_security_group_rule" "alb_to_ghost_2368" {
   source_security_group_id = aws_security_group.alb.id
 }
 
+resource "aws_security_group_rule" "ghost_to_webhooks_8000" {
+  type                     = "ingress"
+  from_port                = 8000
+  to_port                  = 8000
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.webhooks_service.id
+  source_security_group_id = aws_security_group.ghost_service.id
+}
+
 resource "aws_ecs_task_definition" "ghost" {
   family                   = "${local.name_prefix}-ghost-task"
   requires_compatibilities = ["FARGATE"]
@@ -134,7 +183,8 @@ resource "aws_ecs_task_definition" "ghost" {
         { name = "database__connection__host", value = aws_rds_cluster.ghost.endpoint },
         { name = "database__connection__port", value = "3306" },
         { name = "database__connection__user", value = var.db_username },
-        { name = "database__connection__database", value = var.db_name }
+        { name = "database__connection__database", value = var.db_name },
+        { name = "logging__level", value = "info" }
       ]
       secrets = [
         {
@@ -142,6 +192,14 @@ resource "aws_ecs_task_definition" "ghost" {
           valueFrom = "${aws_secretsmanager_secret.db.arn}:password::"
         }
       ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.ghost.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ghost"
+        }
+      }
     }
   ])
 
@@ -170,6 +228,14 @@ resource "aws_ecs_task_definition" "webhooks" {
           appProtocol   = "http"
         }
       ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.webhooks.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "webhooks"
+        }
+      }
     }
   ])
 
