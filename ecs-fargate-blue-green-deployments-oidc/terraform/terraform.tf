@@ -12,7 +12,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "arn:aws:s3:::tfstate-ecs-bluegreen-386452075078"
+    bucket         = "tfstate-ecs-bluegreen-386452075078"
     key            = "ecs-bluegreen/terraform.tfstate"
     region         = "us-west-2"
     use_lockfile   = true
