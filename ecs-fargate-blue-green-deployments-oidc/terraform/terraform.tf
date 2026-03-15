@@ -13,9 +13,9 @@ terraform {
 
   backend "s3" {
     bucket         = "arn:aws:s3:::tfstate-ecs-bluegreen-386452075078"
-    key            = "ecs-fargate-blue-green-deployments-oidc/terraform.tfstate"
+    key            = "ecs-bluegreen/terraform.tfstate"
     region         = "us-west-2"
-    dynamodb_table = "tflock-ecs-bluegreen"
+    use_lockfile   = true
     encrypt        = true
   }
 }
