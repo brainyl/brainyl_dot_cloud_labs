@@ -95,7 +95,7 @@ resource "aws_lb_target_group" "blue_app_tg" {
   health_check {
     path                = "/"
     matcher             = "200-399"
-    interval            = 30
+    interval            = 10
     healthy_threshold   = 2
     unhealthy_threshold = 2
   }
