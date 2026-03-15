@@ -169,7 +169,7 @@ resource "aws_lb_listener_rule" "test" {
   }
 
   lifecycle {
-    ignore_changes = [default_action]
+    ignore_changes = [action]
   }
 }
 
@@ -190,6 +190,6 @@ resource "aws_lb_listener_rule" "production" {
   }
 
   lifecycle {
-    ignore_changes = [default_action]
+    ignore_changes = [action]
   }
 }

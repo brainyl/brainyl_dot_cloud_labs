@@ -14,3 +14,11 @@ output "ecs_cluster_name" {
 output "ecs_service_name" {
   value = aws_ecs_service.app.name
 }
+
+output "production_url" {
+  value = "http://${aws_lb.app.dns_name}"
+}
+
+output "test_url" {
+  value = "http://${aws_lb.app.dns_name}:8080"
+}
