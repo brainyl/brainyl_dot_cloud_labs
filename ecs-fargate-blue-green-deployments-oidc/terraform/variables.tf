@@ -41,7 +41,7 @@ variable "ecs_memory" {
 }
 
 variable "app_version" {
-  default = "blue-v1" # green-v2
+  default = "green-v2" # green-v2
 }
 variable "container_image" {
   description = "container image"
