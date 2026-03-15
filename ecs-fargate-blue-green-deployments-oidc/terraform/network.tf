@@ -112,6 +112,10 @@ resource "aws_lb_listener" "blue_http" {
     type             = "forward"
     target_group_arn = aws_lb_target_group.green_app_tg.arn
   }
+
+  lifecycle {
+    ignore_changes = [default_action]
+  }
 }
 
 resource "aws_lb_target_group" "green_app_tg" {
@@ -142,6 +146,10 @@ resource "aws_lb_listener" "green_http" {
     type             = "forward"
     target_group_arn = aws_lb_target_group.green_app_tg.arn
   }
+
+  lifecycle {
+    ignore_changes = [default_action]
+  }
 }
 
 # Test listener rule - ECS modifies this during blue/green deployment
@@ -159,6 +167,10 @@ resource "aws_lb_listener_rule" "test" {
       values = ["/", "/*"]
     }
   }
+
+  lifecycle {
+    ignore_changes = [default_action]
+  }
 }
 
 # Production listener rule - ECS modifies this during blue/green deployment
@@ -175,5 +187,9 @@ resource "aws_lb_listener_rule" "production" {
     path_pattern {
       values = ["/", "/*"]
     }
+  }
+
+  lifecycle {
+    ignore_changes = [default_action]
   }
 }
