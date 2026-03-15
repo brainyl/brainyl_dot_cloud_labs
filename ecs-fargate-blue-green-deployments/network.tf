@@ -1,6 +1,6 @@
 locals {
   name_prefix = var.project_name
-  nginx_url   = var.nginx_url != "" ? var.nginx_url : "http://${aws_lb.nginx.dns_name}"
+  app_url   = var.app_url != "" ? var.app_url : "http://${aws_lb.app.dns_name}"
   tags = {
     Project = var.project_name
   }
@@ -61,8 +61,8 @@ resource "aws_security_group" "ecs" {
   vpc_id      = module.vpc.vpc_id
 
   ingress {
-    from_port       = 80
-    to_port         = 80
+    from_port       = 8000
+    to_port         = 8000
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
@@ -77,7 +77,7 @@ resource "aws_security_group" "ecs" {
   tags = local.tags
 }
 
-resource "aws_lb" "nginx" {
+resource "aws_lb" "app" {
   name               = "${local.name_prefix}-alb"
   load_balancer_type = "application"
   subnets            = module.vpc.public_subnets
@@ -85,9 +85,9 @@ resource "aws_lb" "nginx" {
   tags               = local.tags
 }
 
-resource "aws_lb_target_group" "blue_nginx_tg" {
+resource "aws_lb_target_group" "blue_app_tg" {
   name        = "${local.name_prefix}-blue-tg"
-  port        = 80
+  port        = 8000
   protocol    = "HTTP"
   target_type = "ip"
   vpc_id      = module.vpc.vpc_id
@@ -104,76 +104,76 @@ resource "aws_lb_target_group" "blue_nginx_tg" {
 }
 
 resource "aws_lb_listener" "blue_http" {
-  load_balancer_arn = aws_lb.nginx.arn
+  load_balancer_arn = aws_lb.app.arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.blue_nginx_tg.arn
+    target_group_arn = aws_lb_target_group.blue_app_tg.arn
   }
 }
 
-resource "aws_lb_target_group" "green_nginx_tg" {
-  name        = "${local.name_prefix}-green-tg"
-  port        = 80
-  protocol    = "HTTP"
-  target_type = "ip"
-  vpc_id      = module.vpc.vpc_id
+# resource "aws_lb_target_group" "green_app_tg" {
+#   name        = "${local.name_prefix}-green-tg"
+#   port        = 8000
+#   protocol    = "HTTP"
+#   target_type = "ip"
+#   vpc_id      = module.vpc.vpc_id
 
-  health_check {
-    path                = "/"
-    matcher             = "200-399"
-    interval            = 30
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-  }
+#   health_check {
+#     path                = "/"
+#     matcher             = "200-399"
+#     interval            = 30
+#     healthy_threshold   = 2
+#     unhealthy_threshold = 2
+#   }
 
-  tags = local.tags
-}
+#   tags = local.tags
+# }
 
 # Test listener (port 8080) - forwards to green TG for validating before production shift
-resource "aws_lb_listener" "green_http" {
-  load_balancer_arn = aws_lb.nginx.arn
-  port              = 8080
-  protocol          = "HTTP"
+# resource "aws_lb_listener" "green_http" {
+#   load_balancer_arn = aws_lb.app.arn
+#   port              = 8080
+#   protocol          = "HTTP"
 
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.green_nginx_tg.arn
-  }
-}
+#   default_action {
+#     type             = "forward"
+#     target_group_arn = aws_lb_target_group.green_app_tg.arn
+#   }
+# }
 
-# Production listener rule - ECS modifies this during blue/green deployment
-resource "aws_lb_listener_rule" "production" {
-  listener_arn = aws_lb_listener.blue_http.arn
-  priority     = 1
+# Test listener rule - ECS modifies this during blue/green deployment
+# resource "aws_lb_listener_rule" "test" {
+#   listener_arn = aws_lb_listener.green_http.arn
+#   priority     = 1
 
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.blue_nginx_tg.arn
-  }
+#   action {
+#     type             = "forward"
+#     target_group_arn = aws_lb_target_group.green_app_tg.arn
+#   }
 
-  condition {
-    path_pattern {
-      values = ["/", "/*"]
-    }
-  }
-}
+#   condition {
+#     path_pattern {
+#       values = ["/", "/*"]
+#     }
+#   }
+# }
 
-# Test listener rule - green TG associated here (satisfies ALB association requirement); ECS manages this rule during deployments
-resource "aws_lb_listener_rule" "test" {
-  listener_arn = aws_lb_listener.green_http.arn
-  priority     = 1
+# # Production listener rule - ECS modifies this during blue/green deployment
+# resource "aws_lb_listener_rule" "production" {
+#   listener_arn = aws_lb_listener.blue_http.arn
+#   priority     = 1
 
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.green_nginx_tg.arn
-  }
+#   action {
+#     type             = "forward"
+#     target_group_arn = aws_lb_target_group.blue_app_tg.arn
+#   }
 
-  condition {
-    path_pattern {
-      values = ["/", "/*"]
-    }
-  }
-}
+#   condition {
+#     path_pattern {
+#       values = ["/", "/*"]
+#     }
+#   }
+# }

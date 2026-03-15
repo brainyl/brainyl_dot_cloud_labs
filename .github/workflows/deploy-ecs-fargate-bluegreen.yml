@@ -1,0 +1,83 @@
+name: deploy-ecs-bluegreen
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ecs-fargate-blue-green-deployments-oidc/app/**"
+      - "ecs-fargate-blue-green-deployments-oidc/terraform/**"
+      - ".github/workflows/deploy-ecs-fargate-bluegreen.yml"
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPO: fastapi-bluegreen
+  PROJECT_DIR: ecs-fargate-blue-green-deployments-oidc
+  TF_WORKING_DIR: ecs-fargate-blue-green-deployments-oidc/terraform
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-ecs-fargate-bluegreen:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        id: build
+        working-directory: ${{ env.PROJECT_DIR }}/app
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::8}"
+          IMAGE_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
+
+          docker buildx build --platform linux/amd64 \
+            -t "$IMAGE_URI" \
+            --push .
+
+          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.13.4"
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform apply
+        run: |
+          terraform apply -auto-approve \
+            -var="container_image=${{ steps.build.outputs.image_uri }}" \
+            -var="app_version=${{ steps.build.outputs.image_tag }}"
+
+      - name: Wait for deployment steady state
+        run: |
+          ECS_CLUSTER=$(terraform output -raw ecs_cluster_name 2>/dev/null || echo "ecs-bluegreen-cluster")
+          ECS_SERVICE=$(terraform output -raw ecs_service_name 2>/dev/null || echo "ecs-bluegreen-service")
+
+          echo "Waiting for ECS service to reach steady state..."
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE"
+          echo "Deployment complete."
+
+      - name: Print endpoints
+        run: |
+          echo "Production: $(terraform output -raw production_url)"
+          echo "Test:       $(terraform output -raw test_url)"
