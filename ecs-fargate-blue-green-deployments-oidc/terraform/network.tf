@@ -1,6 +1,6 @@
 locals {
   name_prefix = var.project_name
-  app_url   = var.app_url != "" ? var.app_url : "http://${aws_lb.app.dns_name}"
+  app_url     = var.app_url != "" ? var.app_url : "http://${aws_lb.app.dns_name}"
   tags = {
     Project = var.project_name
   }
@@ -86,11 +86,12 @@ resource "aws_lb" "app" {
 }
 
 resource "aws_lb_target_group" "blue_app_tg" {
-  name        = "${local.name_prefix}-blue-tg"
-  port        = 8000
-  protocol    = "HTTP"
-  target_type = "ip"
-  vpc_id      = module.vpc.vpc_id
+  name                 = "${local.name_prefix}-blue-tg"
+  port                 = 8000
+  protocol             = "HTTP"
+  target_type          = "ip"
+  vpc_id               = module.vpc.vpc_id
+  deregistration_delay = 10
 
   health_check {
     path                = "/"
@@ -119,12 +120,12 @@ resource "aws_lb_listener" "blue_http" {
 }
 
 resource "aws_lb_target_group" "green_app_tg" {
-  name        = "${local.name_prefix}-green-tg"
-  port        = 8000
-  protocol    = "HTTP"
-  target_type = "ip"
-  vpc_id      = module.vpc.vpc_id
-
+  name                 = "${local.name_prefix}-green-tg"
+  port                 = 8000
+  protocol             = "HTTP"
+  target_type          = "ip"
+  vpc_id               = module.vpc.vpc_id
+  deregistration_delay = 10
   health_check {
     path                = "/"
     matcher             = "200-399"

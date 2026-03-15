@@ -12,11 +12,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "tfstate-ecs-bluegreen-386452075078"
-    key            = "ecs-bluegreen/terraform.tfstate"
-    region         = "us-west-2"
-    use_lockfile   = true
-    encrypt        = true
+    bucket       = "tfstate-ecs-bluegreen-386452075078"
+    key          = "ecs-bluegreen/terraform.tfstate"
+    region       = "us-west-2"
+    use_lockfile = true
+    encrypt      = true
   }
 }
 

@@ -151,9 +151,9 @@ resource "aws_iam_role" "ecs_infra" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect = "Allow"
+      Effect    = "Allow"
       Principal = { Service = "ecs.amazonaws.com" }
-      Action = "sts:AssumeRole"
+      Action    = "sts:AssumeRole"
     }]
   })
 
@@ -183,16 +183,16 @@ resource "aws_ecs_service" "app" {
     container_name   = "app"
     container_port   = 8000
     advanced_configuration {
-      alternate_target_group_arn  = aws_lb_target_group.green_app_tg.arn
-      production_listener_rule    = aws_lb_listener_rule.production.arn
-      test_listener_rule          = aws_lb_listener_rule.test.arn
-      role_arn                    = aws_iam_role.ecs_infra.arn
+      alternate_target_group_arn = aws_lb_target_group.green_app_tg.arn
+      production_listener_rule   = aws_lb_listener_rule.production.arn
+      test_listener_rule         = aws_lb_listener_rule.test.arn
+      role_arn                   = aws_iam_role.ecs_infra.arn
     }
   }
 
   deployment_configuration {
-    strategy = "BLUE_GREEN"
-    bake_time_in_minutes    = 5
+    strategy             = "BLUE_GREEN"
+    bake_time_in_minutes = 5
   }
 
   tags = local.tags

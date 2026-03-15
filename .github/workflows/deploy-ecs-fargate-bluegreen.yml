@@ -2,7 +2,7 @@ name: deploy-ecs-bluegreen
 
 on:
   push:
-    branches: [main]
+    branches: [mainx]
     paths:
       - "ecs-fargate-blue-green-deployments-oidc/app/**"
       - "ecs-fargate-blue-green-deployments-oidc/terraform/**"
