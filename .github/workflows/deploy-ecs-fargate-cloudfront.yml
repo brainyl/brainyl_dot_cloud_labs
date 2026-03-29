@@ -88,4 +88,4 @@ jobs:
 
       - name: Print endpoints
         run: |
-          echo "Production: $(terraform output -raw production_url)"
+          echo "Production: $(terraform output -raw production_url)!"
