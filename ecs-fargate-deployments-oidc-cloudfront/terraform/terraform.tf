@@ -12,8 +12,8 @@ terraform {
   }
 
   backend "s3" {
-    bucket       = "tfstate-ecs-bluegreen-386452075078"
-    key          = "ecs-bluegreen/terraform.tfstate"
+    bucket       = "tfstate-ecs-cloudfront-386452075078"
+    key          = "ecs-cloudfront/terraform.tfstate"
     region       = "us-west-2"
     use_lockfile = true
     encrypt      = true
