@@ -27,6 +27,6 @@ def home():
     <html><body style='font-family: sans-serif; text-align: center; margin-top: 4rem;'>
       <h1 style='color:{color};'>ECS Blue/Green Demo</h1>
       <p>Current version: <strong>{version}</strong></p>
-      <p><a href="/cloudfront-static">/cloudfront-static</a> — JSON with long cache TTL (CloudFront-friendly)</p>
+      <p><a href="/static">/static</a> — JSON with long cache TTL (CloudFront-friendly)</p>
     </body></html>
     """
