@@ -10,7 +10,7 @@ on:
 
 env:
   AWS_REGION: us-west-2
-  ECR_REPO: fastapi-bluegreen
+  ECR_REPO: fastapi-cloudfront
   PROJECT_DIR: ecs-fargate-deployments-oidc-cloudfront
   TF_WORKING_DIR: ecs-fargate-deployments-oidc-cloudfront/terraform
 
@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 jobs:
-  deploy-ecs-fargate-bluegreen:
+  deploy-ecs-fargate-cloudfront:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -77,8 +77,8 @@ jobs:
 
       - name: Wait for deployment steady state
         run: |
-          ECS_CLUSTER=$(terraform output -raw ecs_cluster_name 2>/dev/null || echo "ecs-bluegreen-cluster")
-          ECS_SERVICE=$(terraform output -raw ecs_service_name 2>/dev/null || echo "ecs-bluegreen-service")
+          ECS_CLUSTER=$(terraform output -raw ecs_cluster_name 2>/dev/null || echo "ecs-cloudfront-cluster")
+          ECS_SERVICE=$(terraform output -raw ecs_service_name 2>/dev/null || echo "ecs-cloudfront-service")
 
           echo "Waiting for ECS service to reach steady state..."
           aws ecs wait services-stable \
