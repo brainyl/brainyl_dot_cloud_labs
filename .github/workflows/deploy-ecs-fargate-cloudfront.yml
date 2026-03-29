@@ -2,7 +2,7 @@ name: deploy-ecs-cloudfront
 
 on:
   push:
-    branches: [main]
+    branches: [mainx]
     paths:
       - "ecs-fargate-deployments-oidc-cloudfront/app/**"
       - "ecs-fargate-deployments-oidc-cloudfront/terraform/**"
