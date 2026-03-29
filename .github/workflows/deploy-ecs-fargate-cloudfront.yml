@@ -6,7 +6,7 @@ on:
     paths:
       - "ecs-fargate-deployments-oidc-cloudfront/app/**"
       - "ecs-fargate-deployments-oidc-cloudfront/terraform/**"
-      - ".github/deploy-ecs-fargate-cloudfront.yml"
+      - ".github/workflows/deploy-ecs-fargate-cloudfront.yml"
 
 env:
   AWS_REGION: us-west-2
