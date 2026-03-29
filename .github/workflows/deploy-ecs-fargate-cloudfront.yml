@@ -1,4 +1,4 @@
-name: deploy-ecs-bluegreen
+name: deploy-ecs-cloudfront
 
 on:
   push:
