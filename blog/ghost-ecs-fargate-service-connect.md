@@ -5,7 +5,7 @@ In [Multi-Service ECS: Split Ghost and Webhooks with Cloud Map and Route 53 Serv
 
 In this post, you solve the same split-service problem with **ECS Service Connect**.
 
-<iframe width="776" height="437" src="https://player.vimeo.com/video/1169210167" title="Connect Ghost and Webhooks with ECS Service Connect" frameborder="0" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media" allowfullscreen></iframe>
+[![Connect Ghost and Webhooks with ECS Service Connect](https://img.youtube.com/vi/ShxriLL4Xeo/maxresdefault.jpg)](https://www.youtube.com/watch?v=ShxriLL4Xeo)
 
 ## What You’ll Build
 

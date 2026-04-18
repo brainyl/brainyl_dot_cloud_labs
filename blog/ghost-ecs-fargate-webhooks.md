@@ -7,7 +7,7 @@ That's what you'll build here. You'll add a FastAPI container to the existing ta
 
 The coupling is deliberate. Both containers start together, scale together, and restart together. That's fine for prototyping and for services that are genuinely interdependent. When you need independent scaling or separate deployment cycles, you split them into their own tasks. That's the separate-task architecture covered in a future post.
 
-<iframe width="776" height="437" src="https://www.youtube.com/embed/hZwXO2PmAt4" title="Run Multiple Containers with ECS Fargate Task: Ghost CMS + Webhook Receiver with ECR on AWS" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+[![Run Multiple Containers with ECS Fargate Task: Ghost CMS + Webhook Receiver with ECR on AWS](https://img.youtube.com/vi/hZwXO2PmAt4/maxresdefault.jpg)](https://www.youtube.com/watch?v=hZwXO2PmAt4)
 
 ## What You'll Build
 

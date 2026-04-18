@@ -3,7 +3,7 @@ In the previous webhook post, [Multi-Service ECS: Add a Webhook Receiver to Ghos
 
 In this follow-up, you’ll build the complete production-style path in one place: baseline infrastructure (VPC, ALB, Aurora), webhook image and ECR, then split Ghost and webhooks into separate ECS services connected through Cloud Map service discovery (`webhooks.dev`).
 
-<iframe width="776" height="437" src="https://youtube.com/embed/KO9aOJ_t7js" title="Split Ghost and Webhooks with Cloud Map and Route 53 Service Discovery" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+[![Split Ghost and Webhooks with Cloud Map and Route 53 Service Discovery](https://img.youtube.com/vi/KO9aOJ_t7js/maxresdefault.jpg)](https://www.youtube.com/watch?v=KO9aOJ_t7js)
 
 ## What You’ll Build
 

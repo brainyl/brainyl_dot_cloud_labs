@@ -7,7 +7,7 @@ The container runtime being managed doesn't make Ghost stateless. Ghost still wr
 
 If you followed [Host Your Own Ghost CMS Locally: Multi-Service Stack with Docker Compose](./host-ghost-cms-locally-multi-service-stack-docker-compose.md), [Take Ghost CMS to Production on AWS: CloudFront, ALB, and Aurora Serverless](./ghost-production-aws-cloudfront-alb-aurora.md), [Ghost CMS on AWS with NAT Instances](./ghost-production-aws-nat-instances.md), and [Ghost CMS with Docker on EC2](./ghost-production-docker-containers-ec2.md), this is the next step.
 
-<iframe width="776" height="437" src="https://www.youtube.com/embed/_sy8XUhLaUI" title="Ghost CMS on ECS Fargate" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+[![Ghost CMS on ECS Fargate](https://img.youtube.com/vi/_sy8XUhLaUI/maxresdefault.jpg)](https://www.youtube.com/watch?v=_sy8XUhLaUI)
 
 ## What You'll Build
 

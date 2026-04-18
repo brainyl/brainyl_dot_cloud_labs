@@ -3,7 +3,7 @@ The [ECS blue/green playbook](./ecs-blue-green-deployments-on-fargate.md) walks 
 
 The manual workflow from the previous post had three operator steps: build the image locally, update `terraform.tfvars`, run `terraform apply`. That works for a lab, but it falls apart when multiple engineers are shipping daily. A push to `main` should be all it takes to get a new version into production with the same blue/green safety net.
 
-<iframe width="776" height="437" src="https://player.vimeo.com/video/1177138251" title="Automate ECS Blue/Green Deployments with GitHub Actions and OIDC" frameborder="0" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media" allowfullscreen></iframe>
+[![Automate ECS Blue/Green Deployments with GitHub Actions and OIDC](https://img.youtube.com/vi/MOPP3awZap4/maxresdefault.jpg)](https://www.youtube.com/watch?v=MOPP3awZap4)
 
 ## What You'll Build
 

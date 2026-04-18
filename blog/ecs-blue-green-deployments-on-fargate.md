@@ -5,7 +5,7 @@ You don't need it anymore. ECS now handles blue/green natively — you define th
 
 Here you'll build a minimal FastAPI app, push it to ECR, and deploy it on Fargate with native blue/green traffic shifting. Production traffic runs on port 80, the green candidate is validated on port 8080, and ECS handles the cutover.
 
-<iframe width="776" height="437" src="https://player.vimeo.com/video/1173118316" title="Zero-Downtime Deployments on ECS Fargate with Native Blue/Green" frameborder="0" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media" allowfullscreen></iframe>
+[![Zero-Downtime Deployments on ECS Fargate with Native Blue/Green](https://img.youtube.com/vi/VEhCOvXaAxM/maxresdefault.jpg)](https://www.youtube.com/watch?v=VEhCOvXaAxM)
 
 ## What You'll Build
 
