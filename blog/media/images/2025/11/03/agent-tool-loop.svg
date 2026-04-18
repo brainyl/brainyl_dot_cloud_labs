@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" role="img" aria-labelledby="title desc" width="100%" height="auto" preserveAspectRatio="xMidYMid meet">
+  <title id="title">Agent Action Tool Loop</title>
+  <desc id="desc">Diagram showing the clockwise loop where an agent plans, checks guardrails, calls tools, observes results, and updates shared state.</desc>
+  <defs>
+    <style>
+      .box { stroke: #0f172a; stroke-width: 3; }
+      .plan { fill: #e0f2fe; }
+      .guard { fill: #fef3c7; }
+      .act { fill: #dcfce7; }
+      .observe { fill: #ede9fe; }
+      .update { fill: #fee2e2; }
+      .text { font-family: 'Helvetica Neue', Arial, sans-serif; fill: #0f172a; font-size: 18px; text-anchor: middle; }
+      .caption { font-family: 'Helvetica Neue', Arial, sans-serif; fill: #0f172a; font-size: 20px; text-anchor: middle; font-weight: 500; }
+      .arrow { fill: none; stroke: #0f172a; stroke-width: 4; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="12" refX="6" refY="6" orient="auto">
+      <polygon points="0 0, 12 6, 0 12" fill="#0f172a" />
+    </marker>
+  </defs>
+
+  <rect class="box plan" x="460" y="40" width="280" height="140" rx="22" ry="22" />
+  <text class="text" x="600" y="94">
+    <tspan x="600">Plan Next Step</tspan>
+    <tspan x="600" dy="30">Align Goals &amp; Policies</tspan>
+  </text>
+
+  <rect class="box guard" x="880" y="240" width="280" height="140" rx="22" ry="22" />
+  <text class="text" x="1020" y="294">
+    <tspan x="1020">Guardrails &amp; Approvals</tspan>
+    <tspan x="1020" dy="30">Policies &#183; RBAC &#183; Rate Limits</tspan>
+  </text>
+
+  <rect class="box act" x="460" y="440" width="280" height="140" rx="22" ry="22" />
+  <text class="text" x="600" y="494">
+    <tspan x="600">Call Action Tool</tspan>
+    <tspan x="600" dy="30">APIs &#183; Automations &#183; Tickets</tspan>
+  </text>
+
+  <rect class="box observe" x="60" y="440" width="280" height="140" rx="22" ry="22" />
+  <text class="text" x="200" y="494">
+    <tspan x="200">Observe Response</tspan>
+    <tspan x="200" dy="30">Logs &#183; API Output &#183; Approvals</tspan>
+  </text>
+
+  <rect class="box update" x="60" y="240" width="280" height="140" rx="22" ry="22" />
+  <text class="text" x="200" y="294">
+    <tspan x="200">Update Shared State</tspan>
+    <tspan x="200" dy="30">Dashboards &#183; Tickets &#183; Alerts</tspan>
+  </text>
+
+  <path class="arrow" d="M 740 110 H 1020 V 240" />
+  <path class="arrow" d="M 1020 380 V 510 H 740" />
+  <path class="arrow" d="M 460 510 H 340" />
+  <path class="arrow" d="M 200 440 V 380" />
+  <path class="arrow" d="M 200 240 V 110 H 460" />
+
+  <text class="caption" x="600" y="608">
+    <tspan x="600">Agent tools cycle through plan → guardrail → act → observe → update</tspan>
+    <tspan x="600" dy="28">so every live workflow stays governed.</tspan>
+  </text>
+</svg>

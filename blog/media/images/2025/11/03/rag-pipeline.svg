@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" role="img" aria-labelledby="title desc" width="100%" height="auto" preserveAspectRatio="xMidYMid meet">
+  <title id="title">Retrieval-Augmented Generation Pipeline</title>
+  <desc id="desc">Diagram showing how static content flows through embedding, vector storage, retrieval, prompt grounding, and an LLM answer with citations.</desc>
+  <defs>
+    <style>
+      .box { stroke: #2b6cb0; stroke-width: 3; }
+      .kb { fill: #e0f2fe; }
+      .embed { fill: #ede9fe; }
+      .store { fill: #dcfce7; }
+      .retrieve { fill: #fef3c7; }
+      .ground { fill: #fee2e2; }
+      .answer { fill: #fef9c3; }
+      .text { font-family: 'Helvetica Neue', Arial, sans-serif; fill: #1a365d; font-size: 18px; text-anchor: middle; }
+      .caption { font-family: 'Helvetica Neue', Arial, sans-serif; fill: #2d3748; font-size: 18px; text-anchor: middle; }
+      .arrow { fill: none; stroke: #2b6cb0; stroke-width: 4; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="4" refY="5" orient="auto">
+      <polygon points="0 0, 10 5, 0 10" fill="#2b6cb0" />
+    </marker>
+  </defs>
+
+  <rect class="box kb" x="40" y="80" width="240" height="120" rx="18" ry="18" />
+  <text class="text" x="160" y="130">
+    <tspan x="160">Knowledge Base</tspan>
+    <tspan x="160" dy="26">Policies &#183; Contracts &#183; SOPs</tspan>
+  </text>
+
+  <rect class="box embed" x="360" y="80" width="240" height="120" rx="18" ry="18" />
+  <text class="text" x="480" y="130">
+    <tspan x="480">Embed</tspan>
+    <tspan x="480" dy="26">Vectorize Documents</tspan>
+  </text>
+
+  <rect class="box store" x="680" y="80" width="240" height="120" rx="18" ry="18" />
+  <text class="text" x="800" y="130">
+    <tspan x="800">Vector Store</tspan>
+    <tspan x="800" dy="26">Filtered Retrieval</tspan>
+  </text>
+
+  <rect class="box retrieve" x="40" y="320" width="240" height="120" rx="18" ry="18" />
+  <text class="text" x="160" y="370">
+    <tspan x="160">Retrieve</tspan>
+    <tspan x="160" dy="26">Relevant Snippets</tspan>
+  </text>
+
+  <rect class="box ground" x="360" y="320" width="240" height="120" rx="18" ry="18" />
+  <text class="text" x="480" y="370">
+    <tspan x="480">Ground Prompt</tspan>
+    <tspan x="480" dy="26">Insert Context &amp; Citations</tspan>
+  </text>
+
+  <rect class="box answer" x="680" y="320" width="240" height="120" rx="18" ry="18" />
+  <text class="text" x="800" y="370">
+    <tspan x="800">LLM Answer</tspan>
+    <tspan x="800" dy="26">Grounded &amp; Citeable</tspan>
+  </text>
+
+  <path class="arrow" d="M 280 140 L 360 140" />
+  <path class="arrow" d="M 600 140 L 680 140" />
+  <path class="arrow" d="M 800 200 L 800 320" />
+  <path class="arrow" d="M 280 380 L 360 380" />
+  <path class="arrow" d="M 600 380 L 680 380" />
+
+  <text class="caption" x="480" y="470">RAG keeps generation grounded in the static knowledge your team trusts.</text>
+</svg>
