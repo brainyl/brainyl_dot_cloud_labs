@@ -1,0 +1,376 @@
+name: ECS Full Demo - Build and Publish Services
+
+# Trigger: Push to main/develop or modify this workflow file
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'ecs-full-demo/fullstack-app/**'
+      - '.github/workflows/ecs-full-demo-build-and-publish.yml'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'ecs-full-demo/fullstack-app/**'
+      - '.github/workflows/ecs-full-demo-build-and-publish.yml'
+  workflow_dispatch:
+    inputs:
+      force_build_all:
+        description: 'Force build all services (ignore change detection)'
+        required: false
+        type: boolean
+        default: false
+
+# Required for OIDC authentication
+permissions:
+  id-token: write   # Required for requesting JWT
+  contents: read    # Required for actions/checkout
+
+env:
+  AWS_REGION: us-west-2
+  PROJECT_NAME: simple-app
+  ENVIRONMENT: dev
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-west-2.amazonaws.com
+  APPCONFIG_APPLICATION_ID: ${{ secrets.APPCONFIG_APPLICATION_ID }}
+  APPCONFIG_PROFILE_ID: ${{ secrets.APPCONFIG_PROFILE_ID }}
+
+jobs:
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      mysql: ${{ steps.changes.outputs.mysql }}
+      backend: ${{ steps.changes.outputs.backend }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            mysql:
+              - 'ecs-full-demo/fullstack-app/mysql/**'
+            backend:
+              - 'ecs-full-demo/fullstack-app/backend/**'
+            frontend:
+              - 'ecs-full-demo/fullstack-app/frontend/**'
+
+  build-services:
+    name: Build ${{ matrix.service }} Service
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: mysql
+            context: ./ecs-full-demo/fullstack-app/mysql
+            dockerfile: Dockerfile
+            cpu: "512"
+            memory: "1024"
+            port: 3306
+          - service: backend
+            context: ./ecs-full-demo/fullstack-app/backend
+            dockerfile: Dockerfile
+            cpu: "256"
+            memory: "512"
+            port: 8000
+          - service: frontend
+            context: ./ecs-full-demo/fullstack-app/frontend
+            dockerfile: Dockerfile.prod
+            cpu: "256"
+            memory: "512"
+            port: 80
+    steps:
+      - name: Check if service changed
+        id: should-build
+        run: |
+          # Force build all if manually triggered with force_build_all
+          if [ "${{ github.event.inputs.force_build_all }}" = "true" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Force building ${{ matrix.service }} (manual trigger)"
+            exit 0
+          fi
+          
+          # Otherwise check for changes
+          case "${{ matrix.service }}" in
+            mysql)
+              echo "changed=${{ needs.detect-changes.outputs.mysql }}" >> $GITHUB_OUTPUT
+              ;;
+            backend)
+              echo "changed=${{ needs.detect-changes.outputs.backend }}" >> $GITHUB_OUTPUT
+              ;;
+            frontend)
+              echo "changed=${{ needs.detect-changes.outputs.frontend }}" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Checkout code
+        if: steps.should-build.outputs.changed == 'true'
+        uses: actions/checkout@v4
+
+      - name: Debug OIDC Token
+        if: steps.should-build.outputs.changed == 'true'
+        run: |
+          echo "GitHub Ref: ${{ github.ref }}"
+          echo "GitHub SHA: ${{ github.sha }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Expected subject: repo:${{ github.repository }}:ref:${{ github.ref }}"
+
+      - name: Configure AWS credentials (OIDC)
+        if: steps.should-build.outputs.changed == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-BuildServices-${{ matrix.service }}
+
+      - name: Login to Amazon ECR
+        if: steps.should-build.outputs.changed == 'true'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract metadata
+        if: steps.should-build.outputs.changed == 'true'
+        id: meta
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::7}"
+          echo "tags=${{ env.ECR_REGISTRY }}/${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-${{ matrix.service }}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "image-tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        if: steps.should-build.outputs.changed == 'true'
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.context }}/${{ matrix.dockerfile }}
+          platforms: linux/amd64  # Fargate default architecture
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            ${{ env.ECR_REGISTRY }}/${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-${{ matrix.service }}:latest
+          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-${{ matrix.service }}:latest
+          cache-to: type=inline
+
+      - name: Generate service config
+        if: steps.should-build.outputs.changed == 'true'
+        run: |
+          echo "📝 Generating app configuration for ${{ matrix.service }}..."
+          
+          # Define environment variables per service (application config)
+          # Secrets are managed by Terraform, not here
+          case "${{ matrix.service }}" in
+            mysql)
+              ENV_VARS='{
+                "MYSQL_DATABASE": "simpledb",
+                "MYSQL_USER": "appuser"
+              }'
+              ;;
+            backend)
+              ENV_VARS='{
+                "DB_USERNAME": "appuser",
+                "DB_HOST": "mysql",
+                "DB_PORT": "3306",
+                "DB_NAME": "simpledb"
+              }'
+              ;;
+            frontend)
+              ENV_VARS='{
+                "ALLOW_DELETE": "true"
+              }'
+              ;;
+          esac
+          
+          # Create app-level configuration with environment variables
+          # Infrastructure (secrets, volumes, IAM) managed by Terraform
+          cat > ${{ matrix.service }}-config.json <<EOF
+          {
+            "service": "${{ matrix.service }}",
+            "image": "${{ steps.meta.outputs.tags }}",
+            "imageTag": "${{ steps.meta.outputs.image-tag }}",
+            "digest": "${{ steps.build.outputs.digest }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "resources": {
+              "cpu": "${{ matrix.cpu }}",
+              "memory": "${{ matrix.memory }}"
+            },
+            "environment": ${ENV_VARS}
+          }
+          EOF
+          
+          echo "✅ Generated app configuration for ${{ matrix.service }}"
+          cat ${{ matrix.service }}-config.json | jq .
+
+      - name: Upload service config
+        if: steps.should-build.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.service }}-config
+          path: ${{ matrix.service }}-config.json
+
+  publish-manifest:
+    name: Publish Deployment Manifest
+    needs: [detect-changes, build-services]
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-PublishManifest
+
+      - name: Download existing manifest from AppConfig
+        continue-on-error: true
+        run: |
+          echo "📥 Downloading existing manifest from AppConfig..."
+          
+          # Get the latest hosted configuration version
+          LATEST_VERSION=$(aws appconfig list-hosted-configuration-versions \
+            --application-id ${{ secrets.APPCONFIG_APPLICATION_ID }} \
+            --configuration-profile-id ${{ secrets.APPCONFIG_PROFILE_ID }} \
+            --query 'Items[0].VersionNumber' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$LATEST_VERSION" ] && [ "$LATEST_VERSION" != "None" ]; then
+            echo "Found existing version: $LATEST_VERSION"
+            
+            # Download existing manifest
+            aws appconfig get-hosted-configuration-version \
+              --application-id ${{ secrets.APPCONFIG_APPLICATION_ID }} \
+              --configuration-profile-id ${{ secrets.APPCONFIG_PROFILE_ID }} \
+              --version-number "$LATEST_VERSION" \
+              existing-manifest.json
+            
+            if [ -f existing-manifest.json ] && jq empty existing-manifest.json 2>/dev/null; then
+              echo "✅ Downloaded existing manifest"
+              cat existing-manifest.json | jq .
+            else
+              echo "⚠️  Could not download existing manifest, will create new one"
+              rm -f existing-manifest.json
+            fi
+          else
+            echo "ℹ️  No existing manifest found, will create new one"
+          fi
+
+      - name: Download all configs
+        uses: actions/download-artifact@v4
+        with:
+          path: configs
+
+      - name: Generate deployment manifest
+        run: |
+          mkdir -p manifest
+          
+          # Check if we have an existing manifest to merge with
+          if [ -f existing-manifest.json ]; then
+            echo "📝 Merging with existing manifest..."
+            
+            # Start with existing manifest and update metadata
+            jq --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+               --arg commit "${{ github.sha }}" \
+               --arg branch "${{ github.ref_name }}" \
+               '.timestamp = $timestamp | .commit = $commit | .branch = $branch' \
+               existing-manifest.json > manifest/deployment-manifest.json
+          else
+            echo "📝 Creating new manifest..."
+            
+            # Initialize new manifest
+            cat > manifest/deployment-manifest.json <<EOF
+          {
+            "version": "1.0",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "services": {}
+          }
+          EOF
+          fi
+
+          # Merge all service configs (only changed services)
+          # IMPORTANT: This merges environment variables, not replaces them
+          # - Env vars from build workflow are always included
+          # - Manually added env vars in AppConfig are preserved
+          # - This allows teams to add feature flags without modifying the workflow
+          for config_dir in configs/*/; do
+            if [ -d "$config_dir" ]; then
+              config_file=$(find "$config_dir" -name "*-config.json" -type f)
+              if [ -f "$config_file" ]; then
+                service_name=$(jq -r '.service' "$config_file")
+                echo "Updating service: $service_name"
+                
+                # Smart merge: preserve existing environment variables
+                # Only update image, resources, and merge (not replace) environment
+                jq --arg service "$service_name" --slurpfile data "$config_file" \
+                  '.services[$service] = (
+                    (.services[$service] // {}) as $existing |
+                    $data[0] as $new |
+                    $new + {
+                      environment: (
+                        ($existing.environment // {}) + ($new.environment // {})
+                      )
+                    }
+                  )' manifest/deployment-manifest.json > tmp.json
+                mv tmp.json manifest/deployment-manifest.json
+                
+                echo "✅ Merged config for $service_name (preserved existing env vars)"
+              fi
+            fi
+          done
+
+          echo "✅ Generated deployment manifest:"
+          cat manifest/deployment-manifest.json | jq .
+
+      - name: Upload deployment manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-manifest
+          path: manifest/deployment-manifest.json
+
+      - name: Publish to AWS AppConfig
+        run: |
+          MANIFEST_KEY="deployments/${{ github.sha }}/manifest.json"
+          
+          # Create hosted configuration version in AppConfig
+          aws appconfig create-hosted-configuration-version \
+            --application-id ${{ secrets.APPCONFIG_APPLICATION_ID }} \
+            --configuration-profile-id ${{ secrets.APPCONFIG_PROFILE_ID }} \
+            --content-type "application/json" \
+            --content fileb://manifest/deployment-manifest.json \
+            --description "Deployment manifest for commit ${{ github.sha }}" \
+            appconfig-response.json
+          
+          echo "✅ Manifest published to AppConfig"
+          echo "Application ID: ${{ secrets.APPCONFIG_APPLICATION_ID }}"
+          echo "Profile ID: ${{ secrets.APPCONFIG_PROFILE_ID }}"
+          echo "Commit: ${{ github.sha }}"
+          
+          # Parse and display version info
+          if [ -f appconfig-response.json ]; then
+            VERSION=$(jq -r '.VersionNumber // "unknown"' appconfig-response.json)
+            echo "Version Number: $VERSION"
+          fi
+
+      - name: Create GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: manifest/deployment-manifest.json
+          body: |
+            ## Deployment Manifest
+            
+            This release contains the deployment manifest for all services.
+            
+            Download `deployment-manifest.json` to deploy these versions.

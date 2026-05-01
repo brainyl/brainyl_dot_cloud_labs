@@ -1,0 +1,7 @@
+# Project Configuration
+project_name = "simple-app"
+environment  = "dev"
+aws_region   = "us-west-2"
+
+# ECR Repositories
+ecr_repositories = ["mysql", "backend", "frontend"]

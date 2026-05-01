@@ -1,0 +1,60 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-04-25T10:30:00Z",
+  "commit": "abc1234",
+  "branch": "main",
+  "services": {
+    "mysql": {
+      "service": "mysql",
+      "image": "123456789012.dkr.ecr.us-west-2.amazonaws.com/simple-app-dev-mysql:abc1234",
+      "imageTag": "abc1234",
+      "digest": "sha256:...",
+      "timestamp": "2026-04-25T10:30:00Z",
+      "commit": "abc1234",
+      "resources": {
+        "cpu": "512",
+        "memory": "1024"
+      },
+      "environment": {
+        "MYSQL_DATABASE": "simpledb",
+        "MYSQL_USER": "appuser"
+      }
+    },
+    "backend": {
+      "service": "backend",
+      "image": "123456789012.dkr.ecr.us-west-2.amazonaws.com/simple-app-dev-backend:abc1234",
+      "imageTag": "abc1234",
+      "digest": "sha256:...",
+      "timestamp": "2026-04-25T10:30:00Z",
+      "commit": "abc1234",
+      "resources": {
+        "cpu": "256",
+        "memory": "512"
+      },
+      "environment": {
+        "DB_USERNAME": "appuser",
+        "DB_HOST": "mysql",
+        "DB_PORT": "3306",
+        "DB_NAME": "simpledb",
+        "LOG_LEVEL": "info",
+        "API_TIMEOUT": "30",
+        "ENABLE_CORS": "true"
+      }
+    },
+    "frontend": {
+      "service": "frontend",
+      "image": "123456789012.dkr.ecr.us-west-2.amazonaws.com/simple-app-dev-frontend:abc1234",
+      "imageTag": "abc1234",
+      "digest": "sha256:...",
+      "timestamp": "2026-04-25T10:30:00Z",
+      "commit": "abc1234",
+      "resources": {
+        "cpu": "256",
+        "memory": "512"
+      },
+      "environment": {
+        "ALLOW_DELETE": "true"
+      }
+    }
+  }
+}

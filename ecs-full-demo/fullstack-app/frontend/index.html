@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple App</title>
+  <!-- Runtime config injected by entrypoint.sh from ECS env vars. -->
+  <!-- Falls back to an empty object so dev mode works without the file. -->
+  <script>window.__APP_CONFIG__ = window.__APP_CONFIG__ || {};</script>
+  <script src="/config.js" onerror="console.warn('config.js not found, using defaults')"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

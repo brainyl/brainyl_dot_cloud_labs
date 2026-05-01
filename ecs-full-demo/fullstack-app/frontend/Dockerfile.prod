@@ -1,0 +1,33 @@
+# Multi-stage build for production
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# Production stage with nginx
+FROM nginx:alpine
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Copy built assets from builder
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copy nginx configuration - replace the default nginx.conf
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Entrypoint writes runtime env vars into /config.js before nginx starts
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Create health check endpoint
+RUN echo "OK" > /usr/share/nginx/html/health
+
+EXPOSE 80
+
+CMD ["/entrypoint.sh"]

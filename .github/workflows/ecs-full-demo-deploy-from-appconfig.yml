@@ -1,0 +1,496 @@
+name: ECS Full Demo - Deploy ECS Services from AppConfig
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+      appconfig_application_id:
+        description: 'AppConfig Application ID'
+        required: true
+        type: string
+      appconfig_environment_id:
+        description: 'AppConfig Environment ID'
+        required: true
+        type: string
+      appconfig_profile_id:
+        description: 'AppConfig Configuration Profile ID'
+        required: true
+        type: string
+      appconfig_version:
+        description: 'AppConfig Version Number (leave empty for latest)'
+        required: false
+        type: string
+      force_deployment:
+        description: 'Force new deployment even if no changes'
+        required: false
+        type: boolean
+        default: false
+
+# Required for OIDC authentication
+permissions:
+  id-token: write   # Required for requesting JWT
+  contents: read    # Required for actions/checkout
+
+env:
+  AWS_REGION: us-west-2
+  PROJECT_NAME: simple-app
+  ENVIRONMENT: dev
+
+jobs:
+  retrieve-manifest:
+    name: Retrieve AppConfig Manifest
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.parse-manifest.outputs.services }}
+      manifest-commit: ${{ steps.parse-manifest.outputs.manifest-commit }}
+      manifest-branch: ${{ steps.parse-manifest.outputs.manifest-branch }}
+      manifest-timestamp: ${{ steps.parse-manifest.outputs.manifest-timestamp }}
+      manifest-version: ${{ steps.appconfig.outputs.manifest-version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-RetrieveManifest
+
+      - name: Retrieve deployment manifest from AppConfig
+        id: appconfig
+        run: |
+          # Get AppConfig configuration from inputs
+          APPLICATION_ID="${{ github.event.inputs.appconfig_application_id }}"
+          ENVIRONMENT_ID="${{ github.event.inputs.appconfig_environment_id }}"
+          PROFILE_ID="${{ github.event.inputs.appconfig_profile_id }}"
+          REQUESTED_VERSION="${{ github.event.inputs.appconfig_version }}"
+          
+          echo "Retrieving configuration from AppConfig..."
+          echo "Application: $APPLICATION_ID"
+          echo "Environment: $ENVIRONMENT_ID"
+          echo "Profile: $PROFILE_ID"
+          
+          # Determine which version to use
+          if [ -n "$REQUESTED_VERSION" ]; then
+            echo "Requested version: $REQUESTED_VERSION"
+            VERSION_TO_USE="$REQUESTED_VERSION"
+          else
+            echo "No version specified, using latest..."
+            
+            # Get the latest hosted configuration version
+            VERSION_TO_USE=$(aws appconfig list-hosted-configuration-versions \
+              --application-id "$APPLICATION_ID" \
+              --configuration-profile-id "$PROFILE_ID" \
+              --query 'Items[0].VersionNumber' \
+              --output text)
+            
+            if [ -z "$VERSION_TO_USE" ] || [ "$VERSION_TO_USE" = "None" ]; then
+              echo "❌ No configuration versions found in AppConfig"
+              exit 1
+            fi
+            
+            echo "Latest version: $VERSION_TO_USE"
+          fi
+          
+          # List available versions for reference
+          echo ""
+          echo "📋 Available versions:"
+          aws appconfig list-hosted-configuration-versions \
+            --application-id "$APPLICATION_ID" \
+            --configuration-profile-id "$PROFILE_ID" \
+            --query 'Items[*].{Version:VersionNumber,Description:Description}' \
+            --output table
+          
+          echo ""
+          echo "🎯 Deploying version: $VERSION_TO_USE"
+          
+          # Get the hosted configuration version content
+          aws appconfig get-hosted-configuration-version \
+            --application-id "$APPLICATION_ID" \
+            --configuration-profile-id "$PROFILE_ID" \
+            --version-number "$VERSION_TO_USE" \
+            deployment-manifest.json
+          
+          # Validate manifest exists and is valid JSON
+          if [ ! -f deployment-manifest.json ]; then
+            echo "❌ No deployment manifest found in AppConfig"
+            exit 1
+          fi
+          
+          if ! jq empty deployment-manifest.json 2>/dev/null; then
+            echo "❌ Invalid JSON in deployment manifest"
+            exit 1
+          fi
+          
+          echo "✅ Retrieved deployment manifest (version $VERSION_TO_USE):"
+          cat deployment-manifest.json | jq .
+          
+          # Output the version number
+          echo "manifest-version=${VERSION_TO_USE}" >> $GITHUB_OUTPUT
+
+      - name: Parse services from manifest
+        id: parse-manifest
+        run: |
+          echo "Parsing services and metadata from deployment manifest..."
+          
+          # Extract metadata from manifest
+          MANIFEST_COMMIT=$(jq -r '.commit // "unknown"' deployment-manifest.json)
+          MANIFEST_BRANCH=$(jq -r '.branch // "unknown"' deployment-manifest.json)
+          MANIFEST_TIMESTAMP=$(jq -r '.timestamp // "unknown"' deployment-manifest.json)
+          MANIFEST_VERSION=$(jq -r '.version // "unknown"' deployment-manifest.json)
+          
+          echo "📋 Manifest Metadata:"
+          echo "  Version: $MANIFEST_VERSION"
+          echo "  Commit: $MANIFEST_COMMIT"
+          echo "  Branch: $MANIFEST_BRANCH"
+          echo "  Timestamp: $MANIFEST_TIMESTAMP"
+          
+          # Extract service names and create matrix
+          SERVICES=$(jq -r '.services | keys | @json' deployment-manifest.json)
+          echo "Found services: $SERVICES"
+          
+          # Validate required services exist
+          REQUIRED_SERVICES=("mysql" "backend" "frontend")
+          
+          for service in "${REQUIRED_SERVICES[@]}"; do
+            if ! jq -e ".services.${service}" deployment-manifest.json > /dev/null; then
+              echo "❌ Missing required service: $service"
+              exit 1
+            fi
+            echo "✅ Found service: $service"
+          done
+          
+          # Output all values
+          echo "services=${SERVICES}" >> $GITHUB_OUTPUT
+          echo "manifest-commit=${MANIFEST_COMMIT}" >> $GITHUB_OUTPUT
+          echo "manifest-branch=${MANIFEST_BRANCH}" >> $GITHUB_OUTPUT
+          echo "manifest-timestamp=${MANIFEST_TIMESTAMP}" >> $GITHUB_OUTPUT
+          
+          # Save manifest for deployment jobs
+          echo "Saving manifest for deployment jobs..."
+          cat deployment-manifest.json
+
+      - name: Upload manifest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-manifest
+          path: deployment-manifest.json
+          retention-days: 1
+
+  deploy-services:
+    name: Deploy ${{ matrix.service }} Service
+    needs: retrieve-manifest
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.retrieve-manifest.outputs.services) }}
+      fail-fast: false  # Continue deploying other services if one fails
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-Deploy-${{ matrix.service }}
+
+      - name: Download manifest artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-manifest
+
+      - name: Set deployment variables
+        id: vars
+        run: |
+          # Construct names using PROJECT_NAME and ENVIRONMENT from env
+          CLUSTER_NAME="${PROJECT_NAME}-${ENVIRONMENT}-cluster"
+          SERVICE_NAME="${PROJECT_NAME}-${ENVIRONMENT}-${{ matrix.service }}"
+          TASK_DEFINITION="${PROJECT_NAME}-${ENVIRONMENT}-${{ matrix.service }}"
+          
+          echo "cluster-name=${CLUSTER_NAME}" >> $GITHUB_OUTPUT
+          echo "service-name=${SERVICE_NAME}" >> $GITHUB_OUTPUT
+          echo "task-definition=${TASK_DEFINITION}" >> $GITHUB_OUTPUT
+          
+          echo "Deployment configuration:"
+          echo "  Cluster: ${CLUSTER_NAME}"
+          echo "  Service: ${SERVICE_NAME}"
+          echo "  Task Definition: ${TASK_DEFINITION}"
+
+      - name: Extract service configuration
+        id: service-config
+        run: |
+          echo "Extracting configuration for ${{ matrix.service }}..."
+          
+          SERVICE_CONFIG=$(jq ".services.\"${{ matrix.service }}\"" deployment-manifest.json)
+          
+          if [ "$SERVICE_CONFIG" = "null" ]; then
+            echo "❌ Service ${{ matrix.service }} not found in manifest"
+            exit 1
+          fi
+          
+          IMAGE=$(echo "$SERVICE_CONFIG" | jq -r '.image')
+          
+          echo "Service: ${{ matrix.service }}"
+          echo "New Image: $IMAGE"
+          
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+
+      - name: Update task definition with new image and environment variables
+        id: update-task-def
+        run: |
+          echo "📝 Reading current task definition and updating image + environment variables..."
+          
+          # Get current task definition from ECS (has all infrastructure settings from Terraform)
+          CURRENT_TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition "${{ steps.vars.outputs.task-definition }}" \
+            --query 'taskDefinition' \
+            --output json)
+          
+          # Extract container definitions
+          CONTAINER_DEFS=$(echo "$CURRENT_TASK_DEF" | jq '.containerDefinitions')
+          
+          # Get environment variables from manifest
+          SERVICE_CONFIG=$(jq ".services.\"${{ matrix.service }}\"" deployment-manifest.json)
+          MANIFEST_ENV=$(echo "$SERVICE_CONFIG" | jq -c '.environment // {}')
+          
+          # Convert manifest env object to array format for ECS
+          ENV_ARRAY=$(echo "$MANIFEST_ENV" | jq -c 'to_entries | map({name: .key, value: .value})')
+          
+          echo "Environment variables from manifest:"
+          echo "$ENV_ARRAY" | jq .
+          
+          # Update image AND environment variables in the main service container
+          # Preserve secrets from Terraform (don't touch them)
+          UPDATED_CONTAINER_DEFS=$(echo "$CONTAINER_DEFS" | jq \
+            --arg image "${{ steps.service-config.outputs.image }}" \
+            --arg serviceName "${{ matrix.service }}" \
+            --argjson envArray "$ENV_ARRAY" \
+            'map(
+              if .name == $serviceName then 
+                .image = $image | 
+                .environment = $envArray
+              else . 
+              end
+            )')
+          
+          echo "Updated image and environment variables for ${{ matrix.service }} container"
+          echo "Secrets from Terraform are preserved"
+          
+          # Extract task definition fields (excluding read-only fields)
+          FAMILY=$(echo "$CURRENT_TASK_DEF" | jq -r '.family')
+          NETWORK_MODE=$(echo "$CURRENT_TASK_DEF" | jq -r '.networkMode')
+          TASK_ROLE_ARN=$(echo "$CURRENT_TASK_DEF" | jq -r '.taskRoleArn')
+          EXECUTION_ROLE_ARN=$(echo "$CURRENT_TASK_DEF" | jq -r '.executionRoleArn')
+          CPU=$(echo "$CURRENT_TASK_DEF" | jq -r '.cpu // "null"')
+          MEMORY=$(echo "$CURRENT_TASK_DEF" | jq -r '.memory // "null"')
+          REQUIRES_COMPATIBILITIES=$(echo "$CURRENT_TASK_DEF" | jq -c '.requiresCompatibilities')
+          VOLUMES=$(echo "$CURRENT_TASK_DEF" | jq -c '.volumes // []')
+          RUNTIME_PLATFORM=$(echo "$CURRENT_TASK_DEF" | jq -c '.runtimePlatform // {}')
+          
+          # Build register-task-definition command
+          # For EC2 launch type, CPU and memory are null at task level
+          REGISTER_CMD="aws ecs register-task-definition \
+            --family \"$FAMILY\" \
+            --network-mode \"$NETWORK_MODE\" \
+            --task-role-arn \"$TASK_ROLE_ARN\" \
+            --execution-role-arn \"$EXECUTION_ROLE_ARN\" \
+            --requires-compatibilities '$REQUIRES_COMPATIBILITIES' \
+            --container-definitions '$UPDATED_CONTAINER_DEFS' \
+            --volumes '$VOLUMES'"
+          
+          # Only add CPU/memory if they exist (Fargate requires them, EC2 doesn't)
+          if [ "$CPU" != "null" ] && [ -n "$CPU" ]; then
+            REGISTER_CMD="$REGISTER_CMD --cpu \"$CPU\""
+          fi
+          
+          if [ "$MEMORY" != "null" ] && [ -n "$MEMORY" ]; then
+            REGISTER_CMD="$REGISTER_CMD --memory \"$MEMORY\""
+          fi
+          
+          # Only add runtime-platform if it exists (EC2 doesn't have it)
+          if [ "$RUNTIME_PLATFORM" != "{}" ] && [ "$RUNTIME_PLATFORM" != "null" ]; then
+            REGISTER_CMD="$REGISTER_CMD --runtime-platform '$RUNTIME_PLATFORM'"
+          fi
+          
+          # Register new task definition
+          REGISTER_CMD="$REGISTER_CMD --query 'taskDefinition.taskDefinitionArn' --output text"
+          
+          echo "Registering task definition..."
+          NEW_TASK_DEF=$(eval $REGISTER_CMD)
+          
+          echo "✅ Registered new task definition: $NEW_TASK_DEF"
+          echo "task-definition-arn=${NEW_TASK_DEF}" >> $GITHUB_OUTPUT
+
+      - name: Deploy ${{ matrix.service }} service
+        run: |
+          echo "🚀 Deploying ${{ matrix.service }} service..."
+          echo "Image: ${{ steps.service-config.outputs.image }}"
+          echo "Task Definition: ${{ steps.update-task-def.outputs.task-definition-arn }}"
+          echo "Cluster: ${{ steps.vars.outputs.cluster-name }}"
+          echo "Service: ${{ steps.vars.outputs.service-name }}"
+          
+          # Update ECS service with new task definition
+          aws ecs update-service \
+            --cluster "${{ steps.vars.outputs.cluster-name }}" \
+            --service "${{ steps.vars.outputs.service-name }}" \
+            --task-definition "${{ steps.update-task-def.outputs.task-definition-arn }}" \
+            --force-new-deployment \
+            --query 'service.{serviceName:serviceName,status:status,runningCount:runningCount,desiredCount:desiredCount,taskDefinition:taskDefinition}' \
+            --output table
+          
+          echo "✅ ${{ matrix.service }} deployment initiated"
+
+      - name: Wait for ${{ matrix.service }} deployment
+        run: |
+          echo "⏳ Waiting for ${{ matrix.service }} to reach steady state..."
+          
+          aws ecs wait services-stable \
+            --cluster "${{ steps.vars.outputs.cluster-name }}" \
+            --services "${{ steps.vars.outputs.service-name }}" \
+            --cli-read-timeout 900 \
+            --cli-connect-timeout 60
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ ${{ matrix.service }} is stable and healthy"
+          else
+            echo "❌ ${{ matrix.service }} failed to stabilize"
+            exit 1
+          fi
+
+      - name: Verify ${{ matrix.service }} deployment
+        run: |
+          echo "🔍 Verifying ${{ matrix.service }} deployment..."
+          
+          # Get detailed service status
+          aws ecs describe-services \
+            --cluster "${{ steps.vars.outputs.cluster-name }}" \
+            --services "${{ steps.vars.outputs.service-name }}" \
+            --query 'services[0].{Name:serviceName,Status:status,Running:runningCount,Desired:desiredCount,TaskDefinition:taskDefinition,LastDeployment:deployments[0].{Status:status,CreatedAt:createdAt}}' \
+            --output table
+
+  verify-deployment:
+    name: Verify Complete Deployment
+    needs: [retrieve-manifest, deploy-services]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-VerifyDeployment
+
+      - name: Set deployment variables
+        id: vars
+        run: |
+          # Construct names using PROJECT_NAME and ENVIRONMENT from env
+          CLUSTER_NAME="${PROJECT_NAME}-${ENVIRONMENT}-cluster"
+          NAME_PREFIX="${PROJECT_NAME}-${ENVIRONMENT}"
+          
+          echo "cluster-name=${CLUSTER_NAME}" >> $GITHUB_OUTPUT
+          echo "name-prefix=${NAME_PREFIX}" >> $GITHUB_OUTPUT
+          
+          echo "Verification configuration:"
+          echo "  Cluster: ${CLUSTER_NAME}"
+          echo "  Name Prefix: ${NAME_PREFIX}"
+
+      - name: Get overall deployment status
+        run: |
+          echo "🔍 Verifying complete deployment..."
+          
+          # Get all service statuses
+          aws ecs describe-services \
+            --cluster "${{ steps.vars.outputs.cluster-name }}" \
+            --services \
+              "${{ steps.vars.outputs.name-prefix }}-mysql" \
+              "${{ steps.vars.outputs.name-prefix }}-backend" \
+              "${{ steps.vars.outputs.name-prefix }}-frontend" \
+            --query 'services[*].{Name:serviceName,Status:status,Running:runningCount,Desired:desiredCount,TaskDefinition:taskDefinition}' \
+            --output table
+
+      - name: Test application endpoints
+        run: |
+          echo "🌐 Testing application endpoints..."
+          
+          # Get ALB DNS name
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names "${{ steps.vars.outputs.name-prefix }}-alb" \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text 2>/dev/null || echo "ALB not found")
+          
+          if [ "$ALB_DNS" != "ALB not found" ] && [ "$ALB_DNS" != "None" ]; then
+            echo "🔗 Application URL: http://$ALB_DNS"
+            echo "🔗 Health Check: http://$ALB_DNS/health"
+            
+            # Test health endpoint
+            echo "Testing health endpoint..."
+            if curl -f -s --max-time 10 "http://$ALB_DNS/health" > /dev/null; then
+              echo "✅ Health check passed"
+            else
+              echo "⚠️  Health check failed (application may still be starting)"
+            fi
+            
+            # Test main application
+            echo "Testing main application..."
+            if curl -f -s --max-time 10 "http://$ALB_DNS" | grep -q "Simple App"; then
+              echo "✅ Application is responding"
+            else
+              echo "⚠️  Application not responding yet (may take a few minutes)"
+            fi
+          else
+            echo "⚠️  ALB not found or not ready"
+          fi
+
+      - name: Create deployment summary
+        if: always()
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ env.ENVIRONMENT }}" >> $GITHUB_STEP_SUMMARY
+          echo "**AppConfig Version:** ${{ needs.retrieve-manifest.outputs.manifest-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit SHA:** ${{ needs.retrieve-manifest.outputs.manifest-commit }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ needs.retrieve-manifest.outputs.manifest-branch }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** ${{ needs.retrieve-manifest.outputs.manifest-timestamp }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Cluster:** ${{ steps.vars.outputs.cluster-name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Check if all deploy jobs succeeded
+          if [ "${{ needs.deploy-services.result }}" = "success" ]; then
+            echo "✅ **Status:** All services deployed successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status:** Some services failed to deploy" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Add service URLs if available
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names "${{ steps.vars.outputs.name-prefix }}-alb" \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$ALB_DNS" ] && [ "$ALB_DNS" != "None" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🌐 Application URLs" >> $GITHUB_STEP_SUMMARY
+            echo "- **Frontend:** http://$ALB_DNS" >> $GITHUB_STEP_SUMMARY
+            echo "- **Health Check:** http://$ALB_DNS/health" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Services Deployed" >> $GITHUB_STEP_SUMMARY
+          
+          # List services from matrix
+          SERVICES='${{ needs.retrieve-manifest.outputs.services }}'
+          echo "$SERVICES" | jq -r '.[]' | while read service; do
+            echo "- $service" >> $GITHUB_STEP_SUMMARY
+          done

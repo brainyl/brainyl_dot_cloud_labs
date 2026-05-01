@@ -1,0 +1,28 @@
+# Project Configuration
+project_name = "simple-app"
+environment  = "dev"
+aws_region   = "us-west-2"
+
+# Networking
+vpc_cidr           = "10.0.0.0/16"
+enable_nat_gateway = true  # Set to false for dev to save costs
+
+# ALB Configuration
+certificate_arn            = ""  # Optional: ARN of ACM certificate for HTTPS
+alb_deregistration_delay   = 30
+alb_health_check_interval  = 15
+alb_health_check_timeout   = 5
+alb_healthy_threshold      = 2
+alb_unhealthy_threshold    = 2
+
+# MySQL Configuration
+mysql_cpu    = 512
+mysql_memory = 1024
+
+# Backend Configuration
+backend_cpu    = 256
+backend_memory = 512
+
+# Frontend Configuration
+frontend_cpu    = 256
+frontend_memory = 512
