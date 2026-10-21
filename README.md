@@ -9,7 +9,7 @@ Practical, reproducible labs covering **AWS, DevOps, containers, Kubernetes, and
 | Lab | Code | Walkthrough |
 | --- | --- | --- |
 | Deploy Ghost CMS on ECS Fargate with Aurora Serverless and an ALB | [Ghost ECS lab](./ghost_ecs/) | [Step-by-step guide](./blog/ghost-ecs-fargate.md) |
-| Extend Ghost with a webhook receiver | [Ghost ECS and webhooks lab](./ghost_ecs/) | [Multi-container guide](./blog/ghost-ecs-fargate-webhooks.md) |
+| Extend Ghost with a webhook receiver | [Webhook receiver code](./ghost_ecs/webhooks/) | [Multi-container guide](./blog/ghost-ecs-fargate-webhooks.md) |
 | Split services using AWS Cloud Map and Route 53 | [Cloud Map lab](./ghost-ecs-fargate-cloudmap-route53-service-discovery/) | [Service-discovery guide](./blog/ghost-ecs-fargate-service-discovery.md) |
 | Connect separate services with ECS Service Connect | [Service Connect lab](./ghost-ecs-fargate-service-connect/) | [Service Connect guide](./blog/ghost-ecs-fargate-service-connect.md) |
 | Explore ECS deployments with GitHub OIDC and blue/green strategies | [OIDC blue/green lab](./ecs-fargate-blue-green-deployments-oidc/) | [CI/CD guide](./blog/ecs-blue-green-github-actions-ci-cd.md) |
