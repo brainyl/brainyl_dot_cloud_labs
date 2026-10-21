@@ -11,6 +11,26 @@ Hands-on Terraform lab for deploying **Ghost CMS on Amazon ECS Fargate**, backed
 
 > The video shows a live, hands-on deployment, including AWS Console steps and troubleshooting. This directory provides a Terraform-based implementation of the architecture; individual commands and clicks may differ from the recording.
 
+## Jump straight to the practical build
+
+Don't need the entire 80-minute live recording? Use these **direct video timestamps** to follow only the parts you need. The [written GitHub lab guide](../blog/ghost-ecs-fargate.md) and Terraform files in this folder remain the source for reproducing the stack.
+
+| What you want to do | Jump to the video |
+| --- | --- |
+| Understand the complete architecture | [00:00 — Overview](https://youtu.be/_sy8XUhLaUI?t=0) |
+| Set up ECS permissions | [10:04 — IAM roles](https://youtu.be/_sy8XUhLaUI?t=604) |
+| Prepare the network | [17:31 — VPC with Terraform](https://youtu.be/_sy8XUhLaUI?t=1051) |
+| Define the container | [20:41 — ECS task definition](https://youtu.be/_sy8XUhLaUI?t=1241) |
+| Deploy the service | [23:14 — ECS cluster and service](https://youtu.be/_sy8XUhLaUI?t=1394) |
+| Diagnose an initial failure | [29:25 — Troubleshooting](https://youtu.be/_sy8XUhLaUI?t=1765) |
+| Set up the database | [31:11 — Aurora Serverless](https://youtu.be/_sy8XUhLaUI?t=1871) |
+| Make the app reachable | [41:18 — Application Load Balancer](https://youtu.be/_sy8XUhLaUI?t=2478) |
+| Configure credentials | [48:30 — Secrets Manager](https://youtu.be/_sy8XUhLaUI?t=2910) |
+| See the finished result | [1:07:00 — Live Ghost test](https://youtu.be/_sy8XUhLaUI?t=4020) |
+| Avoid surprise AWS charges | [1:12:54 — Cleanup](https://youtu.be/_sy8XUhLaUI?t=4374) |
+
+> If you're learning ECS for the first time, watch the [core concepts from 01:38](https://youtu.be/_sy8XUhLaUI?t=98) first. These links point to the **original live video**; the lab code is a Terraform implementation of the same infrastructure, not a frame-by-frame transcript of the AWS Console operations.
+
 ## Architecture
 
 ```text
