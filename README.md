@@ -4,6 +4,10 @@ Practical, reproducible labs covering **AWS, DevOps, containers, Kubernetes, and
 
 **Start with the lab code.** Each lab has its own directory so you can explore the infrastructure and applications directly.
 
+## Start here: Amazon ECS learning path
+
+**Wondering which ECS video to watch first?** Follow the [8-part ECS Fargate learning path](./ECS_LEARNING_PATH.md), ordered from first Ghost deployment through service discovery, native blue/green, GitHub Actions, CloudFront and a full-stack AppConfig capstone. Or [open the ECS YouTube playlist](https://www.youtube.com/playlist?list=PL5ymUCY9LDOBRP6QSz4KXRjGepIq7RjxJ).
+
 ## Ghost CMS: from containers to ECS
 
 | Lab | Code | Walkthrough |
