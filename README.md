@@ -4,6 +4,10 @@ Practical, reproducible labs covering **AWS, DevOps, containers, Kubernetes, and
 
 **Start with the lab code.** Each lab has its own directory so you can explore the infrastructure and applications directly.
 
+## AWS Serverless & AI Agents
+
+**Watch the [two-part Serverless & AI Agents learning path](./SERVERLESS_AI_AGENTS_LEARNING_PATH.md)**: build event-driven workflows with EventBridge Pipes, DynamoDB, SQS and Lambda, then build a Strands agent on Lambda with Amazon Bedrock and SNS. Includes video chapters, a written Strands lab, and production caveats around competing SQS consumers.
+
 ## AWS Networking & Private Infrastructure
 
 **Start with the [five-part AWS Networking learning path](./NETWORKING_LEARNING_PATH.md)**: AWS IPAM and scalable CIDR planning → Regional NAT and full VPC validation → PrivateLink across VPCs → isolated EC2 with VPC endpoints → EC2 Image Builder. Each entry links to the exact YouTube lesson and any matching GitHub lab.
