@@ -4,6 +4,10 @@ Practical, reproducible labs covering **AWS, DevOps, containers, Kubernetes, and
 
 **Start with the lab code.** Each lab has its own directory so you can explore the infrastructure and applications directly.
 
+## AWS Networking & Private Infrastructure
+
+**Start with the [five-part AWS Networking learning path](./NETWORKING_LEARNING_PATH.md)**: AWS IPAM and scalable CIDR planning → Regional NAT and full VPC validation → PrivateLink across VPCs → isolated EC2 with VPC endpoints → EC2 Image Builder. Each entry links to the exact YouTube lesson and any matching GitHub lab.
+
 ## Start here: Amazon ECS learning path
 
 **Wondering which ECS video to watch first?** Follow the [8-part ECS Fargate learning path](./ECS_LEARNING_PATH.md), ordered from first Ghost deployment through service discovery, native blue/green, GitHub Actions, CloudFront and a full-stack AppConfig capstone. Or [open the ECS YouTube playlist](https://www.youtube.com/playlist?list=PL5ymUCY9LDOBRP6QSz4KXRjGepIq7RjxJ).
